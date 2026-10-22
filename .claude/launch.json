@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "naturoflow",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "NATUROFLOW_HOME=.naturoflow-dev NATUROFLOW_TOKEN=dev-local-token NODE_NO_WARNINGS=1 npx tsx packages/cli/src/index.ts serve --port 7788"],
+      "port": 7788
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "video-to-gif",
+  "name": "测试视频 → GIF + 媒体信息",
+  "nodes": [
+    { "id": "src", "type": "ffmpeg.testsrc", "params": { "duration": 2 }, "position": { "x": 0, "y": 80 } },
+    { "id": "gif", "type": "ffmpeg.to-gif", "params": { "fps": 8, "width": 200 }, "position": { "x": 300, "y": 0 } },
+    { "id": "probe", "type": "ffmpeg.probe", "position": { "x": 300, "y": 160 } },
+    { "id": "merge", "type": "object.merge", "position": { "x": 600, "y": 80 } },
+    { "id": "summary", "type": "python.transform", "position": { "x": 850, "y": 80 },
+      "params": { "code": "result = {'durationSec': input['b'], 'gifBytes': input['a']['size'], 'gif': input['a']['path']}" } },
+    { "id": "out", "type": "core.output", "params": { "key": "summary" }, "position": { "x": 1100, "y": 80 } }
+  ],
+  "edges": [
+    { "from": { "node": "src", "port": "video" }, "to": { "node": "gif", "port": "video" } },
+    { "from": { "node": "src", "port": "video" }, "to": { "node": "probe", "port": "file" } },
+    { "from": { "node": "gif", "port": "gif" }, "to": { "node": "merge", "port": "a" } },
+    { "from": { "node": "probe", "port": "duration" }, "to": { "node": "merge", "port": "b" } },
+    { "from": { "node": "merge", "port": "value" }, "to": { "node": "summary", "port": "input" } },
+    { "from": { "node": "summary", "port": "result" }, "to": { "node": "out", "port": "value" } }
+  ]
+}

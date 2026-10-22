@@ -1,0 +1,21 @@
+{
+  "id": "batch-gifs",
+  "name": "批量生成 GIF（If + Map）",
+  "description": "列表非空时对每个时长调用 make-gif，否则返回提示。",
+  "nodes": [
+    { "id": "list", "type": "core.input", "params": { "key": "durations", "type": "json", "description": "时长列表，例如 [1, 2]", "default": [1, 2, 3] }, "position": { "x": 0, "y": 80 } },
+    { "id": "has_items", "type": "core.if", "params": { "condition": "Array.isArray(value) && value.length > 0" }, "position": { "x": 280, "y": 80 } },
+    { "id": "each", "type": "core.map", "params": { "workflow": "make-gif", "itemKey": "seconds", "pick": "gif", "concurrency": 3 }, "position": { "x": 560, "y": 0 } },
+    { "id": "empty", "type": "js.transform", "label": "空列表提示", "params": { "code": "return '没有要生成的 GIF';" }, "position": { "x": 560, "y": 200 } },
+    { "id": "merge", "type": "object.merge", "position": { "x": 840, "y": 80 } },
+    { "id": "out", "type": "core.output", "params": { "key": "result" }, "position": { "x": 1100, "y": 80 } }
+  ],
+  "edges": [
+    { "from": { "node": "list", "port": "value" }, "to": { "node": "has_items", "port": "value" } },
+    { "from": { "node": "has_items", "port": "true" }, "to": { "node": "each", "port": "items" } },
+    { "from": { "node": "has_items", "port": "false" }, "to": { "node": "empty", "port": "input" } },
+    { "from": { "node": "each", "port": "results" }, "to": { "node": "merge", "port": "a" } },
+    { "from": { "node": "empty", "port": "result" }, "to": { "node": "merge", "port": "b" } },
+    { "from": { "node": "merge", "port": "value" }, "to": { "node": "out", "port": "value" } }
+  ]
+}

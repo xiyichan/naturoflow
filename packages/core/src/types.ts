@@ -1,0 +1,194 @@
+import { z } from "zod";
+
+/** Port value types. `list<T>` is written as e.g. "list<file>". */
+export const PortType = z
+  .string()
+  .regex(/^(any|string|number|boolean|json|file|list<(any|string|number|boolean|json|file)>)$/, "invalid port type");
+export type PortType = z.infer<typeof PortType>;
+
+export const PortDef = z.object({
+  type: PortType.default("any"),
+  required: z.boolean().default(true),
+  description: z.string().optional(),
+});
+export type PortDef = z.infer<typeof PortDef>;
+
+/** Duration: number of ms, or a string like "30s", "500ms", "10m". */
+export const Duration = z.union([z.number(), z.string().regex(/^\d+(ms|s|m|h)$/)]);
+
+export function parseDuration(d: number | string | undefined, fallback: number): number {
+  if (d === undefined) return fallback;
+  if (typeof d === "number") return d;
+  const m = /^(\d+)(ms|s|m|h)$/.exec(d)!;
+  const n = Number(m[1]);
+  return n * { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[m[2] as "ms" | "s" | "m" | "h"];
+}
+
+/**
+ * Every executor's `outputs` maps an output port to a template evaluated against the
+ * executor result (http: {status, headers, body}; command: {stdout, stderr, exitCode}).
+ */
+const OutputMap = z.record(z.string(), z.any()).optional();
+/** A map, or a single `{{...}}` template that evaluates to one. */
+const TemplatedMap = z.union([z.record(z.string(), z.any()), z.string()]).optional();
+
+export const HttpExecutor = z.object({
+  kind: z.literal("http"),
+  method: z.string().default("GET"),
+  url: z.string(),
+  headers: TemplatedMap,
+  query: TemplatedMap,
+  body: z.any().optional(),
+  bodyType: z.enum(["json", "form", "text"]).default("json"),
+  responseType: z.enum(["json", "text", "file"]).default("json"),
+  /** Treat non-2xx as failure (default true). */
+  failOnError: z.boolean().default(true),
+  outputs: OutputMap,
+});
+
+export const CommandExecutor = z.object({
+  kind: z.literal("command"),
+  bin: z.string(),
+  args: z.array(z.any()).default([]),
+  env: TemplatedMap,
+  outputs: OutputMap,
+});
+
+export const ScriptExecutor = z
+  .object({
+    kind: z.literal("script"),
+    language: z.enum(["js", "python"]).default("js"),
+    code: z.string().optional(),
+    /** Path to the script, relative to the node type file. */
+    file: z.string().optional(),
+  })
+  .refine((s) => !!s.code !== !!s.file, "script executor needs exactly one of `code` or `file`");
+
+/** Runs another workflow; input ports map to its core.input keys, outputs to its core.output keys. */
+export const SubflowExecutor = z.object({
+  kind: z.literal("subflow"),
+  workflow: z.string(),
+  outputs: OutputMap,
+});
+
+export const BuiltinExecutor = z.object({
+  kind: z.literal("builtin"),
+  name: z.string(),
+});
+
+export const Executor = z.union([HttpExecutor, CommandExecutor, ScriptExecutor, SubflowExecutor, BuiltinExecutor]);
+export type Executor = z.infer<typeof Executor>;
+
+export const NodeTypeDef = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_.-]+$/, "id may only contain letters, digits, _ . -"),
+  name: z.string(),
+  category: z.string().default("general"),
+  description: z.string().optional(),
+  inputs: z.record(z.string(), PortDef).default({}),
+  /** JSON Schema (object) describing configurable params. */
+  params: z.record(z.string(), z.any()).default({ type: "object", properties: {} }),
+  outputs: z.record(z.string(), PortDef).default({}),
+  executor: Executor,
+  timeout: Duration.optional(),
+  retry: z.object({ max: z.number().int().min(0).default(0), backoff: Duration.default(1000) }).optional(),
+  /**
+   * Reuse outputs when the same type definition, params and inputs were seen before.
+   * Off by default: only turn it on for deterministic nodes (ffmpeg yes, HTTP POST no).
+   */
+  cache: z.boolean().default(false),
+});
+export type NodeTypeDef = z.infer<typeof NodeTypeDef>;
+export type NodeTypeInput = z.input<typeof NodeTypeDef>;
+
+export const PortRef = z.object({ node: z.string(), port: z.string() });
+
+export const WorkflowNode = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+  type: z.string(),
+  params: z.record(z.string(), z.any()).default({}),
+  position: z.object({ x: z.number(), y: z.number() }).default({ x: 0, y: 0 }),
+  label: z.string().optional(),
+  /** Override the node type's `cache` setting for this node. */
+  cache: z.boolean().optional(),
+});
+export type WorkflowNode = z.infer<typeof WorkflowNode>;
+
+export const WorkflowEdge = z.object({ from: PortRef, to: PortRef });
+export type WorkflowEdge = z.infer<typeof WorkflowEdge>;
+
+export const ToolPublish = z.object({
+  name: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/, "tool name may only contain letters, digits, _ and - (max 64)"),
+  description: z.string().optional(),
+});
+export type ToolPublish = z.infer<typeof ToolPublish>;
+
+export const Workflow = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  nodes: z.array(WorkflowNode).default([]),
+  edges: z.array(WorkflowEdge).default([]),
+  version: z.number().int().default(1),
+  /** When set, the workflow is exposed as an MCP tool with this name. */
+  tool: ToolPublish.optional(),
+});
+export type Workflow = z.infer<typeof Workflow>;
+export type WorkflowInput = z.input<typeof Workflow>;
+
+/** How files travel between nodes. */
+export interface FileRef {
+  $file: true;
+  path: string;
+  size: number;
+  mime: string;
+}
+
+export type RunStatus = "pending" | "running" | "success" | "failed" | "skipped" | "cancelled";
+
+export interface NodeRunRecord {
+  runId: string;
+  nodeId: string;
+  status: RunStatus;
+  inputs?: Record<string, unknown>;
+  outputs?: Record<string, unknown>;
+  logs: string[];
+  error?: string;
+  attempts: number;
+  startedAt?: number;
+  finishedAt?: number;
+  /** Output ports that did not fire (e.g. the untaken side of core.if). */
+  inactive?: string[];
+  /** Where the outputs came from when the node did not execute. */
+  cached?: "cache" | "reuse";
+  /** Human-readable explanation, e.g. why a node was skipped. */
+  note?: string;
+}
+
+export interface RunRecord {
+  id: string;
+  workflowId: string;
+  status: RunStatus;
+  inputs: Record<string, unknown>;
+  outputs?: Record<string, unknown>;
+  error?: string;
+  startedAt: number;
+  finishedAt?: number;
+  nodes: Record<string, NodeRunRecord>;
+  /** Set when this run was started by a subflow/map node. */
+  parentRunId?: string;
+  /** Set when this run re-ran part of an earlier run. */
+  rerunOf?: { runId: string; fromNode: string };
+}
+
+export class NfError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public path?: string,
+  ) {
+    super(message);
+  }
+  toJSON() {
+    return { code: this.code, message: this.message, path: this.path };
+  }
+}

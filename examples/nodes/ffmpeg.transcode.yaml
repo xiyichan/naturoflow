@@ -1,0 +1,24 @@
+id: ffmpeg.transcode
+name: FFmpeg 转码
+category: media
+inputs:
+  video: { type: file }
+params:
+  type: object
+  properties:
+    codec: { type: string, default: libx264 }
+    crf: { type: integer, default: 23 }
+    extraArgs: { type: array, items: { type: string }, default: [] }
+    ext: { type: string, default: mp4 }
+outputs:
+  video: { type: file }
+executor:
+  kind: command
+  bin: ffmpeg
+  args: ["-y", "-hide_banner", "-loglevel", "error", "-i", "{{inputs.video.path}}",
+         "-c:v", "{{params.codec}}", "-crf", "{{params.crf}}", "{{params.extraArgs}}",
+         "{{ctx.outDir}}/out.{{params.ext}}"]
+  outputs:
+    video: "{{ctx.outDir}}/out.{{params.ext}}"
+timeout: 30m
+cache: true

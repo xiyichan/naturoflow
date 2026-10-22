@@ -1,0 +1,20 @@
+id: python.transform
+name: Python 脚本
+category: script
+description: 运行 Python 表达式/代码，`result` 变量作为输出。
+inputs:
+  input: { type: any, required: false }
+params:
+  type: object
+  properties:
+    code: { type: string, default: "result = input" }
+outputs:
+  result: { type: any }
+executor:
+  kind: script
+  language: python
+  code: |
+    def main(inputs, params, ctx):
+        ns = {"input": inputs.get("input"), "params": params, "log": ctx.log}
+        exec(params["code"], ns)
+        return {"result": ns.get("result")}

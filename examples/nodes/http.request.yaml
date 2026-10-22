@@ -1,0 +1,27 @@
+id: http.request
+name: HTTP 请求
+category: network
+description: 通用 HTTP 请求，body 以 JSON 发送，返回解析后的响应体。
+inputs:
+  body: { type: json, required: false }
+params:
+  type: object
+  required: [url]
+  properties:
+    method: { type: string, enum: [GET, POST, PUT, PATCH, DELETE], default: GET }
+    url: { type: string }
+    headers: { type: object, default: {} }
+outputs:
+  body: { type: json }
+  status: { type: number }
+executor:
+  kind: http
+  method: "{{params.method}}"
+  url: "{{params.url}}"
+  headers: "{{params.headers}}"
+  body: "{{inputs.body}}"
+  outputs:
+    body: "{{body}}"
+    status: "{{status}}"
+timeout: 60s
+retry: { max: 2, backoff: 1s }

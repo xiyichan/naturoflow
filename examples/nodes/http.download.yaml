@@ -1,0 +1,17 @@
+id: http.download
+name: 下载文件
+category: network
+params:
+  type: object
+  required: [url]
+  properties:
+    url: { type: string }
+outputs:
+  file: { type: file }
+executor:
+  kind: http
+  url: "{{params.url}}"
+  responseType: file
+  outputs:
+    file: "{{body}}"
+timeout: 10m

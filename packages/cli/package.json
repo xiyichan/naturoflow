@@ -1,0 +1,12 @@
+{
+  "name": "@naturoflow/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "naturoflow": "./src/index.ts"
+  },
+  "dependencies": {
+    "@naturoflow/core": "workspace:*",
+    "@naturoflow/server": "workspace:*"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "naturoflow",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/web/tsconfig.json",
+    "nf": "NODE_NO_WARNINGS=1 tsx packages/cli/src/index.ts",
+    "web:dev": "pnpm --filter @naturoflow/web dev",
+    "web:build": "pnpm --filter @naturoflow/web build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.7"
+  }
+}

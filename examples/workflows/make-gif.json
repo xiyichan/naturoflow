@@ -1,0 +1,16 @@
+{
+  "id": "make-gif",
+  "name": "生成指定时长的 GIF",
+  "description": "生成一段 testsrc 测试视频并转成 GIF。被 batch-gifs 用 Map 调用。",
+  "nodes": [
+    { "id": "seconds", "type": "core.input", "params": { "key": "seconds", "type": "number", "description": "视频时长（秒）", "default": 1 }, "position": { "x": 0, "y": 0 } },
+    { "id": "src", "type": "ffmpeg.testsrc", "params": { "duration": "{{workflow.inputs.seconds}}", "size": "160x120" }, "position": { "x": 300, "y": 0 } },
+    { "id": "gif", "type": "ffmpeg.to-gif", "params": { "fps": 6, "width": 120 }, "position": { "x": 600, "y": 0 } },
+    { "id": "out", "type": "core.output", "params": { "key": "gif" }, "position": { "x": 900, "y": 0 } }
+  ],
+  "edges": [
+    { "from": { "node": "src", "port": "video" }, "to": { "node": "gif", "port": "video" } },
+    { "from": { "node": "gif", "port": "gif" }, "to": { "node": "out", "port": "value" } }
+  ],
+  "tool": { "name": "make_test_gif", "description": "Generate a test-pattern GIF of the given length in seconds; returns the GIF file." }
+}

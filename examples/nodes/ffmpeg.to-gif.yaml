@@ -1,0 +1,22 @@
+id: ffmpeg.to-gif
+name: 视频转 GIF
+category: media
+inputs:
+  video: { type: file }
+params:
+  type: object
+  properties:
+    fps: { type: integer, default: 10 }
+    width: { type: integer, default: 320 }
+outputs:
+  gif: { type: file }
+executor:
+  kind: command
+  bin: ffmpeg
+  args: ["-y", "-hide_banner", "-loglevel", "error", "-i", "{{inputs.video}}",
+         "-vf", "fps={{params.fps}},scale={{params.width}}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
+         "{{ctx.outDir}}/out.gif"]
+  outputs:
+    gif: "{{ctx.outDir}}/out.gif"
+timeout: 10m
+cache: true

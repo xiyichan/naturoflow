@@ -1,0 +1,5 @@
+node_modules/
+.naturoflow-dev/
+packages/web/dist/
+*.log
+.DS_Store

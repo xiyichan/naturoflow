@@ -1,0 +1,70 @@
+import fs from "node:fs";
+import path from "node:path";
+import { render } from "../template.ts";
+import type { HttpExecutor } from "../types.ts";
+import type { z } from "zod";
+import { templateScope, type ExecArgs } from "./types.ts";
+
+type Spec = z.infer<typeof HttpExecutor>;
+
+export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string, unknown>> {
+  const scope = templateScope(args);
+  const method = String(render(spec.method, scope)).toUpperCase();
+  const url = new URL(String(render(spec.url, scope)));
+  for (const [k, v] of Object.entries((render(spec.query ?? {}, scope) as Record<string, unknown>) ?? {})) {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  }
+  const headers = new Headers(
+    Object.entries((render(spec.headers ?? {}, scope) as Record<string, unknown>) ?? {}).map(([k, v]): [string, string] => [k, String(v)]),
+  );
+
+  let body: BodyInit | undefined;
+  if (spec.body !== undefined && method !== "GET" && method !== "HEAD") {
+    const b = render(spec.body, scope);
+    if (spec.bodyType === "json") {
+      body = JSON.stringify(b);
+      if (!headers.has("content-type")) headers.set("content-type", "application/json");
+    } else if (spec.bodyType === "form") {
+      body = new URLSearchParams(b as Record<string, string>);
+    } else body = typeof b === "string" ? b : JSON.stringify(b);
+  }
+
+  args.ctx.log(`${method} ${url}`);
+  const res = await fetch(url, { method, headers, body, signal: args.ctx.signal });
+  args.ctx.log(`-> ${res.status} ${res.statusText}`);
+
+  let resBody: unknown;
+  if (spec.responseType === "file") {
+    const name = path.basename(url.pathname) || "download";
+    const file = path.join(args.ctx.outDir, name);
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    resBody = file;
+  } else {
+    const text = await res.text();
+    if (spec.responseType === "json") {
+      try {
+        resBody = text === "" ? null : JSON.parse(text);
+      } catch {
+        resBody = text;
+      }
+    } else resBody = text;
+  }
+
+  if (spec.failOnError && !res.ok) {
+    const snippet = typeof resBody === "string" ? resBody : JSON.stringify(resBody);
+    throw new Error(`HTTP ${res.status}: ${snippet?.slice(0, 500)}`);
+  }
+
+  const result = { status: res.status, headers: Object.fromEntries(res.headers), body: resBody };
+  return mapOutputs(spec.outputs, { ...scope, ...result, result }, { body: resBody, status: res.status, headers: result.headers });
+}
+
+/** Apply an executor's `outputs` map; when absent, fall back to the default result. */
+export function mapOutputs(
+  outputs: Record<string, unknown> | undefined,
+  scope: Record<string, unknown>,
+  fallback: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!outputs) return fallback;
+  return Object.fromEntries(Object.entries(outputs).map(([port, tpl]) => [port, render(tpl, scope)]));
+}

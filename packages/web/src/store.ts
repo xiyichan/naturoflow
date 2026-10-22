@@ -1,0 +1,264 @@
+import { create } from "zustand";
+import {
+  api,
+  ApiError,
+  type NodeRun,
+  type NodeTypeDef,
+  type NodeTypeSummary,
+  type PatchOp,
+  type Run,
+  type ServerEvent,
+  type ValidationIssue,
+  type Workflow,
+  type WorkflowSummary,
+} from "./api.ts";
+
+export type EditorTarget = { mode: "new" } | { mode: "edit"; id: string } | null;
+
+interface State {
+  auth: "checking" | "ok" | "needed";
+  connected: boolean;
+  nodeTypes: Record<string, NodeTypeSummary>;
+  defs: Record<string, NodeTypeDef>;
+  workflows: WorkflowSummary[];
+  workflow: Workflow | null;
+  issues: ValidationIssue[];
+  selected: string | null;
+  run: Run | null;
+  runs: Omit<Run, "nodes">[];
+  notice: { kind: "info" | "error"; text: string } | null;
+  editor: EditorTarget;
+  logOpen: boolean;
+
+  init(): Promise<void>;
+  loadNodeTypes(): Promise<void>;
+  loadDef(id: string): Promise<NodeTypeDef>;
+  openWorkflow(id: string): Promise<void>;
+  createWorkflow(name: string): Promise<void>;
+  deleteWorkflow(id: string): Promise<void>;
+  patch(ops: PatchOp[]): Promise<boolean>;
+  layout(): Promise<void>;
+  startRun(inputs: Record<string, unknown>, useCache?: boolean): Promise<void>;
+  rerunFrom(nodeId: string): Promise<void>;
+  cancelRun(): Promise<void>;
+  showRun(id: string): Promise<void>;
+  select(id: string | null): void;
+  notify(kind: "info" | "error", text: string): void;
+  setEditor(t: EditorTarget): void;
+  setLogOpen(open: boolean): void;
+  handleEvent(e: ServerEvent): void;
+}
+
+const LAST_WF = "naturoflow.lastWorkflow";
+const storage = {
+  get: (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set: (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {}
+  },
+};
+
+function message(e: unknown) {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export const useStore = create<State>((set, get) => ({
+  auth: "checking",
+  connected: false,
+  nodeTypes: {},
+  defs: {},
+  workflows: [],
+  workflow: null,
+  issues: [],
+  selected: null,
+  run: null,
+  runs: [],
+  notice: null,
+  editor: null,
+  logOpen: false,
+
+  async init() {
+    try {
+      const [types, workflows] = await Promise.all([api.nodeTypes(), api.workflows()]);
+      set({ auth: "ok", nodeTypes: Object.fromEntries(types.map((t) => [t.id, t])), workflows });
+      const last = storage.get(LAST_WF);
+      const first = workflows.find((w) => w.id === last) ?? workflows[0];
+      if (first) await get().openWorkflow(first.id);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) set({ auth: "needed" });
+      else get().notify("error", `无法连接服务：${message(e)}`);
+    }
+  },
+
+  async loadNodeTypes() {
+    const types = await api.nodeTypes();
+    set({ nodeTypes: Object.fromEntries(types.map((t) => [t.id, t])), defs: {} });
+  },
+
+  async loadDef(id) {
+    const cached = get().defs[id];
+    if (cached) return cached;
+    const def = await api.nodeType(id);
+    set((s) => ({ defs: { ...s.defs, [id]: def } }));
+    return def;
+  },
+
+  async openWorkflow(id) {
+    const [workflow, issues, runs] = await Promise.all([api.workflow(id), api.validate(id), api.runs(id)]);
+    storage.set(LAST_WF, id);
+    set({ workflow, issues, runs, selected: null, run: null });
+    if (runs[0]) await get().showRun(runs[0].id);
+  },
+
+  async createWorkflow(name) {
+    const wf = await api.createWorkflow(name);
+    set({ workflows: await api.workflows() });
+    await get().openWorkflow(wf.id);
+  },
+
+  async deleteWorkflow(id) {
+    await api.deleteWorkflow(id);
+    const workflows = await api.workflows();
+    set({ workflows, workflow: get().workflow?.id === id ? null : get().workflow });
+    if (!get().workflow && workflows[0]) await get().openWorkflow(workflows[0].id);
+  },
+
+  async patch(ops) {
+    const wf = get().workflow;
+    if (!wf) return false;
+    try {
+      const { workflow, issues } = await api.patch(wf.id, ops, wf.version);
+      // An SSE event may already have delivered a newer version.
+      if ((get().workflow?.version ?? 0) <= workflow.version) set({ workflow, issues });
+      return true;
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
+        get().notify("info", "工作流刚被别处修改过（可能是 AI），已刷新到最新版本，请重试");
+        await get().openWorkflow(wf.id);
+      } else get().notify("error", message(e));
+      return false;
+    }
+  },
+
+  async layout() {
+    const wf = get().workflow;
+    if (wf) set({ workflow: await api.layout(wf.id) });
+  },
+
+  async rerunFrom(nodeId) {
+    const run = get().run;
+    if (!run) return;
+    try {
+      const { id } = await api.rerun(run.id, nodeId);
+      if (get().run?.id !== id) set({ run: await api.getRun(id) });
+      set({ logOpen: true });
+    } catch (e) {
+      get().notify("error", message(e));
+    }
+  },
+
+  async startRun(inputs, useCache = true) {
+    const wf = get().workflow;
+    if (!wf) return;
+    try {
+      const { id } = await api.run(wf.id, inputs, useCache);
+      // run.started usually arrives over SSE first; fetch in case it didn't.
+      if (get().run?.id !== id) set({ run: await api.getRun(id) });
+      set({ logOpen: true });
+    } catch (e) {
+      const issues = e instanceof ApiError ? e.issues : undefined;
+      if (issues) set({ issues });
+      get().notify("error", issues ? "工作流还有问题，修好后再运行" : message(e));
+    }
+  },
+
+  async cancelRun() {
+    const run = get().run;
+    if (run) await api.cancelRun(run.id);
+  },
+
+  async showRun(id) {
+    set({ run: await api.getRun(id) });
+  },
+
+  select(id) {
+    set({ selected: id });
+  },
+
+  notify(kind, text) {
+    set({ notice: { kind, text } });
+    const current = get().notice;
+    setTimeout(() => {
+      if (get().notice === current) set({ notice: null });
+    }, kind === "error" ? 8000 : 4000);
+  },
+
+  setEditor(editor) {
+    set({ editor });
+  },
+
+  setLogOpen(logOpen) {
+    set({ logOpen });
+  },
+
+  handleEvent(e) {
+    const s = get();
+    const wfId = s.workflow?.id;
+    switch (e.type) {
+      case "workflow.changed": {
+        if (e.workflow.id === wfId && e.workflow.version > (s.workflow?.version ?? 0)) {
+          set({ workflow: e.workflow });
+          api.validate(e.workflow.id).then((issues) => {
+            if (get().workflow?.id === e.workflow.id) set({ issues });
+          });
+        }
+        if (!s.workflows.some((w) => w.id === e.workflow.id && w.name === e.workflow.name)) {
+          api.workflows().then((workflows) => set({ workflows }));
+        }
+        break;
+      }
+      case "workflow.deleted":
+        set({ workflows: s.workflows.filter((w) => w.id !== e.id) });
+        if (e.id === wfId) {
+          set({ workflow: null, run: null });
+          s.notify("info", "当前工作流已被删除");
+        }
+        break;
+      case "nodeType.changed":
+        s.loadNodeTypes();
+        break;
+      case "run.started":
+        // Child runs of subflow/map nodes belong to their parent; don't take over the canvas.
+        if (e.run.workflowId === wfId && !e.run.parentRunId) set({ run: e.run, runs: [e.run, ...s.runs].slice(0, 10) });
+        break;
+      case "node.started":
+      case "node.log":
+      case "node.finished": {
+        const run = s.run;
+        if (!run || run.id !== e.runId) return;
+        const prev: NodeRun = run.nodes[e.type === "node.finished" ? e.node.nodeId : e.nodeId];
+        let next: NodeRun;
+        if (e.type === "node.started") next = { ...prev, status: "running", startedAt: Date.now() };
+        else if (e.type === "node.log") next = { ...prev, logs: [...prev.logs, e.line].slice(-2000) };
+        else next = { ...e.node, logs: e.node.logs.length ? e.node.logs : prev.logs };
+        set({ run: { ...run, nodes: { ...run.nodes, [next.nodeId]: next } } });
+        break;
+      }
+      case "run.finished":
+        if (e.run.workflowId === wfId && !e.run.parentRunId) {
+          set({ run: s.run?.id === e.run.id || !s.run ? e.run : s.run, runs: s.runs.map((r) => (r.id === e.run.id ? e.run : r)) });
+          if (s.run?.id === e.run.id) {
+            s.notify(e.run.status === "success" ? "info" : "error", e.run.status === "success" ? "运行完成" : `运行${e.run.status === "cancelled" ? "已取消" : "失败"}${e.run.error ? `：${e.run.error}` : ""}`);
+          }
+        }
+        break;
+    }
+  },
+}));

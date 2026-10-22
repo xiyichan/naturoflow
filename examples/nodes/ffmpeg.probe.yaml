@@ -1,0 +1,16 @@
+id: ffmpeg.probe
+name: 媒体信息
+category: media
+inputs:
+  file: { type: file }
+outputs:
+  info: { type: json }
+  duration: { type: number }
+executor:
+  kind: command
+  bin: ffprobe
+  args: ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", "{{inputs.file}}"]
+  outputs:
+    info: "{{stdout | fromjson}}"
+    duration: "{{stdout | fromjson | get:'format.duration' | number}}"
+cache: true

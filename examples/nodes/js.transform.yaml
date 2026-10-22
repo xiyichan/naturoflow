@@ -1,0 +1,20 @@
+id: js.transform
+name: JS 脚本
+category: script
+description: 在 worker 线程中运行一段 JS，code 参数为函数体，可访问 inputs / params。返回值作为 result 输出。
+inputs:
+  input: { type: any, required: false }
+params:
+  type: object
+  properties:
+    code: { type: string, default: "return inputs.input;" }
+outputs:
+  result: { type: any }
+executor:
+  kind: script
+  language: js
+  code: |
+    export default async ({ inputs, params, ctx }) => {
+      const fn = new Function("inputs", "params", "ctx", `return (async () => { ${params.code} })()`);
+      return { result: await fn(inputs, params, ctx) };
+    };

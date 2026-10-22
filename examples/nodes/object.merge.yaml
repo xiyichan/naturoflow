@@ -1,0 +1,16 @@
+id: object.merge
+name: 合并为对象
+category: data
+description: 把最多 4 个输入合并成一个对象 {a, b, c, d}。
+inputs:
+  a: { type: any, required: false }
+  b: { type: any, required: false }
+  c: { type: any, required: false }
+  d: { type: any, required: false }
+outputs:
+  value: { type: json }
+executor:
+  kind: script
+  language: js
+  code: |
+    export default async ({ inputs }) => ({ value: inputs });
