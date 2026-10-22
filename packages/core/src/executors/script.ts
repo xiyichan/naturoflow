@@ -30,12 +30,14 @@ function runJs(code: string | undefined, file: string | undefined, args: ExecArg
     const done = () => args.ctx.signal.removeEventListener("abort", onAbort);
     worker.on("message", (m) => {
       if (m.type === "log") args.ctx.log(m.line);
+      else if (m.type === "trace") args.ctx.trace(m.value);
       else if (m.type === "result") {
         done();
         resolve(m.value);
         worker.terminate();
       } else if (m.type === "error") {
         done();
+        if (m.stack) args.ctx.log(m.stack);
         reject(new Error(m.message));
         worker.terminate();
       }

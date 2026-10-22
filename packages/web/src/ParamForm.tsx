@@ -91,7 +91,8 @@ function Field({
   } else if (schema.type === "number" || schema.type === "integer") {
     control = <NumberInput id={id} value={shown} integer={schema.type === "integer"} onChange={onChange} />;
   } else if (schema.type === "string") {
-    const long = name === "code" || (typeof shown === "string" && (shown.length > 60 || shown.includes("\n")));
+    const long =
+      name === "code" || schema.format === "multiline" || (typeof shown === "string" && (shown.length > 60 || shown.includes("\n")));
     // An emptied field means "not set" (the default applies / the field is left out of requests).
     const set = (v: string) => onChange(v === "" ? undefined : v);
     control = long ? (

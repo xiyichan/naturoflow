@@ -1,0 +1,111 @@
+id: seedream.generate
+name: Seedream 生成图片
+category: ai
+description: >-
+  BytePlus ModelArk Seedream 图片生成，主要面向 Seedream 5.0：文生图、图生图、多图融合、
+  交互编辑（在提示词里用 <bbox>x1 y1 x2 y2</bbox> 标区域）、图层拆分、透明背景。
+  参考图可以填 URL，或从 image 端口传入本地文件（自动转 base64）。生成的图片会下载到本地，
+  file / files 输出可以直接预览或交给下游。只发送设置过的参数。
+credentials:
+  type: byteplus-ark
+  name: BytePlus ModelArk
+  fields:
+    api_key:
+      label: API Key
+      description: 在 ModelArk 控制台的 API Key 管理页面创建
+    base_url:
+      label: 接口地址
+      secret: false
+      required: false
+      description: 留空使用官方地址 https://ark.ap-southeast.bytepluses.com/api/v3；用代理或其他区域时填自己的地址（到 /api/v3 或 /v1 为止）
+inputs:
+  image:
+    type: any
+    required: false
+    description: 参考图：URL、data:image/...;base64、上游的文件，或它们的列表。和参数里的参考图合并发送
+params:
+  type: object
+  required: [model]
+  properties:
+    prompt:
+      type: string
+      format: multiline
+      description: >-
+        提示词，建议不超过 300 个汉字或 600 个英文单词。交互编辑可用 <bbox>x1 y1 x2 y2</bbox> 标出区域（0–1000 归一化坐标）。
+        图层拆分时可省略，模型会自动识别主要元素。可写 {{workflow.inputs.xxx}}
+    model:
+      type: string
+      default: dola-seedream-5-0-pro-260628
+      description: 模型 ID 或 Endpoint ID。文档示例：dola-seedream-5-0-pro-260628（5.0 pro）、seedream-5-0-260128（组图 / 流式示例所用）；其他在 ModelArk 控制台查看
+    image:
+      type: string
+      format: multiline
+      description: 参考图 URL 或本地文件路径，每行一张。5.0 pro / flash 最多 10 张，5.0 lite / 4.5 / 4.0 最多 14 张
+    layer_decomposition:
+      type: boolean
+      description: 图层拆分：把一张图拆成底图 + 最多 16 个透明图层（PNG）。需要且只能有一张参考图。仅 5.0 pro / flash
+    size:
+      type: string
+      description: 分辨率档位 1K / 1.5K / 2K（5.0 pro / flash；图层拆分还可填 auto），或像素如 2048x1024（总像素 1280x720 到约 2048x2048）。不填用接口默认 2K
+    optimize_prompt_mode:
+      type: string
+      enum: [standard, fast]
+      description: 提示词优化模式（optimize_prompt_options.mode）。fast 更快但质量略低，仅 5.0 pro 支持
+    output_format:
+      type: string
+      enum: [png, jpeg]
+      description: 输出格式，仅 5.0 系列。图层拆分时只影响底图，图层固定 png。不填用接口默认 jpeg
+    background:
+      type: string
+      enum: [opaque, transparent]
+      description: transparent 生成透明背景：只支持一张带透明通道的参考图（如 png），输出须为 png。仅 5.0 pro / flash
+    watermark:
+      type: boolean
+      description: 是否在右下角加 “AI-generated” 水印；不填用接口默认（加）
+    response_format:
+      type: string
+      enum: [url, b64_json]
+      description: url 返回 24 小时有效的链接；b64_json 直接返回图片数据。两种都会保存成本地文件
+    sequential_image_generation:
+      type: string
+      enum: [disabled, auto]
+      description: 组图：auto 时模型按提示词决定生成几张相关图片。仅 5.0 lite / 4.5 / 4.0，5.0 pro / flash 请不要填
+    max_images:
+      type: integer
+      minimum: 1
+      maximum: 15
+      description: 组图最多生成几张（参考图数 + 生成数 ≤ 15），仅组图模式下填写
+    download:
+      type: boolean
+      default: true
+      description: 把生成的图片保存到本地（输出 file / files）。关掉则只返回链接
+outputs:
+  file:
+    type: file
+    required: false
+    description: 第一张图（图层拆分时是底图）
+  files:
+    type: list<file>
+    description: 全部图片的本地文件
+  url:
+    type: string
+    required: false
+    description: 第一张图的链接（24 小时内有效）
+  urls:
+    type: list<string>
+  images:
+    type: json
+    description: 接口返回的 data[]（含 size、output_format，图层拆分时还有 z_index / name / description / bounding_box），并标出对应的本地文件
+  layers:
+    type: json
+    required: false
+    description: 图层拆分结果：每层的 z_index、名称、描述、边界框和文件
+  usage:
+    type: json
+    required: false
+executor:
+  kind: script
+  language: js
+  file: seedream.generate.mjs
+# Billed per image, so never retried automatically.
+timeout: 10m
