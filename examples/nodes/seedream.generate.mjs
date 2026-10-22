@@ -50,9 +50,8 @@ export default async ({ inputs, params, ctx }) => {
   const base = (ctx.credential.base_url || DEFAULT_BASE_URL).replace(/\/+$/, "");
 
   // Order matters ("图1", "图2" in prompts): ports image, image_2, image_3, image_4, then param lines.
-  const images = [inputs.image, inputs.image_2, inputs.image_3, inputs.image_4, params.image]
-    .flatMap(collectImages)
-    .map(toApiImage);
+  // The same image arriving twice (e.g. from a port and pasted into the param) is sent once.
+  const images = [...new Set([inputs.image, inputs.image_2, inputs.image_3, inputs.image_4, params.image].flatMap(collectImages).map(toApiImage))];
 
   // Build the body from set values only.
   const body = { model: params.model };

@@ -134,6 +134,19 @@ describe("seedream.generate", () => {
     });
     expect(run.status).toBe("success");
     expect(requests[0].body.image).toEqual([`data:image/png;base64,${PNG.toString("base64")}`, "https://cdn.example.com/cat.png"]);
+
+    // The same link pasted into the param as well is not sent twice.
+    requests = [];
+    await svc.runWorkflow({
+      id: "dup",
+      name: "dup",
+      nodes: [
+        { id: "design", type: "core.const", params: { value: "https://cdn.example.com/cat.png" } },
+        { id: "gen", type: "seedream.generate", credential: credId, params: { prompt: "p", image: "https://cdn.example.com/cat.png\nhttps://cdn.example.com/hoodie.png" } },
+      ],
+      edges: [{ from: { node: "design", port: "value" }, to: { node: "gen", port: "image_2" } }],
+    });
+    expect(requests[0].body.image).toEqual(["https://cdn.example.com/cat.png", "https://cdn.example.com/hoodie.png"]);
   });
 
   it("layer decomposition downloads the base image and every layer", async () => {
