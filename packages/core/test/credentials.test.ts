@@ -73,6 +73,10 @@ describe("credentials", () => {
     const r2 = await svc.runWorkflow(wf(two.id));
     expect(r1.outputs?.body).toEqual({ who: "Bearer key-one-secret" });
     expect(r2.outputs?.body).toEqual({ who: "Bearer key-two-secret" });
+    // The mock API echoes the key back; the logged response and outputs are masked.
+    const logs = r1.nodes.call.logs.join("\n");
+    expect(logs).toContain('"who": "Bearer ****"');
+    expect(logs).not.toContain("key-one-secret");
   });
 
   it("validates and fails clearly without a usable credential", async () => {

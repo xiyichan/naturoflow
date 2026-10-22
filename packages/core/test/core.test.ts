@@ -46,6 +46,16 @@ describe("template", () => {
   });
 });
 
+describe("log previews", () => {
+  it("shortens long strings and caps the line", async () => {
+    const { preview } = await import("../src/logfmt.ts");
+    const out = preview({ b64: "x".repeat(5000), ok: true });
+    expect(out).toContain("…(+4600 chars)");
+    expect(out).toContain('"ok": true');
+    expect(preview("y".repeat(5000), 100)).toContain("truncated, 5000 chars total");
+  });
+});
+
 describe("request bodies", () => {
   it("drop unset (null/undefined) fields and objects emptied by that", () => {
     expect(
@@ -106,6 +116,10 @@ describe("executors", () => {
     const run = await svc.runWorkflow(wf);
     expect(run.status).toBe("success");
     expect(run.outputs?.res).toEqual({ method: "POST", url: "/echo", body: { hello: "world" } });
+    // The response JSON and the node's outputs are printed to its log.
+    const logs = run.nodes.req.logs.join("\n");
+    expect(logs).toContain('response: {\n  "method": "POST"');
+    expect(logs).toContain("outputs: {");
   });
 
   it("http: non-2xx fails, retries, and skips downstream", async () => {

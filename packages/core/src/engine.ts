@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execute, INACTIVE } from "./executors/index.ts";
 import { isFileRef, toFileRef } from "./files.ts";
 import { portCompatible } from "./ports.ts";
+import { preview } from "./logfmt.ts";
 import { render } from "./template.ts";
 import type { NodeRegistry } from "./registry.ts";
 import {
@@ -342,11 +343,16 @@ export class Engine extends EventEmitter {
       if (nr.logs.length > 2000) nr.logs.splice(0, nr.logs.length - 2000);
       this.emit("event", { type: "node.log", runId: run.id, nodeId: node.id, line } satisfies EngineEvent);
     };
+    // Every successful node ends its log with what it produced (masked like any other line).
+    const logOutputs = (outputs?: Record<string, unknown>) => {
+      if (outputs && Object.keys(outputs).length) log(`outputs: ${preview(outputs)}`);
+    };
 
     // 1. Reuse outputs from an earlier run (rerun-from-node).
     const prev = ro.reuse?.[node.id];
     if (prev?.status === "success" && filesIntact(prev.outputs)) {
       log(`reused outputs from run ${prev.runId}`);
+      logOutputs(prev.outputs);
       this.finishNode(run, node.id, "success", prev.outputs, undefined, { inactive: prev.inactive, cached: "reuse" });
       return;
     }
@@ -359,6 +365,7 @@ export class Engine extends EventEmitter {
       const hit = this.opts.cache!.get(cacheKey);
       if (hit && filesIntact(hit.outputs)) {
         log(`cache hit ${cacheKey.slice(0, 12)}`);
+        logOutputs(hit.outputs);
         this.finishNode(run, node.id, "success", hit.outputs, undefined, { inactive: hit.inactive, cached: "cache" });
         return;
       }
@@ -414,6 +421,7 @@ export class Engine extends EventEmitter {
           outputs[port] = coerce(raw[port], pdef);
         }
         if (cacheKey) this.opts.cache!.set(cacheKey, { outputs, inactive });
+        logOutputs(outputs);
         this.finishNode(run, node.id, "success", outputs, undefined, inactive.length ? { inactive } : {});
         return;
       } catch (e) {

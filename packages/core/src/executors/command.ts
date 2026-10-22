@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import type { z } from "zod";
+import { preview } from "../logfmt.ts";
 import { render } from "../template.ts";
 import type { CommandExecutor } from "../types.ts";
 import { mapOutputs } from "./http.ts";
@@ -45,7 +46,7 @@ export async function runCommand(spec: Spec, args: ExecArgs): Promise<Record<str
       child.on("close", (code) => resolve({ stdout: out, stderr: err, exitCode: code ?? -1 }));
     },
   );
-  if (stdout) args.ctx.log(`(stdout: ${stdout.length} bytes)`);
+  if (stdout.trim()) args.ctx.log(`stdout: ${preview(stdout.trim())}`);
   if (exitCode !== 0) throw new Error(`${bin} exited with code ${exitCode}: ${stderr.slice(-800)}`);
 
   const result = { stdout, stderr, exitCode };

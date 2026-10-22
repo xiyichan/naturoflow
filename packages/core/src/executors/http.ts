@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { preview } from "../logfmt.ts";
 import { render } from "../template.ts";
 import type { HttpExecutor } from "../types.ts";
 import type { z } from "zod";
@@ -37,7 +38,9 @@ export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string
   if (spec.responseType === "file") {
     const name = path.basename(url.pathname) || "download";
     const file = path.join(args.ctx.outDir, name);
-    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    const buf = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(file, buf);
+    args.ctx.log(`saved ${file} (${buf.length} bytes, ${res.headers.get("content-type") ?? "unknown type"})`);
     resBody = file;
   } else {
     const text = await res.text();
@@ -48,6 +51,7 @@ export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string
         resBody = text;
       }
     } else resBody = text;
+    if (res.ok) args.ctx.log(`response: ${preview(resBody)}`);
   }
 
   if (spec.failOnError && !res.ok) {

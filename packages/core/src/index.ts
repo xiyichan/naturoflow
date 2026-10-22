@@ -1,5 +1,6 @@
 export * from "./types.ts";
 export * from "./template.ts";
+export * from "./logfmt.ts";
 export * from "./files.ts";
 export * from "./engine.ts";
 export * from "./ports.ts";
