@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fileUrl, type NodePreview } from "./api.ts";
 import { useStore } from "./store.ts";
 
@@ -122,6 +122,9 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
       ) : (
         <p className="nf-res__text">{summary(cur.outputs)}</p>
       )}
+      {previews.length > 1 && (
+        <HistoryStrip previews={previews} current={i} pinnedRunId={pinnedRunId} broken={broken} onPick={setI} />
+      )}
       <div className="nf-res__bar">
         <button disabled={i >= previews.length - 1} onClick={() => setI(i + 1)} aria-label="更早的结果" title="更早的结果">
           ‹
@@ -144,6 +147,54 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Every past result as a thumbnail; click one to show it (then 选用 it if wanted). */
+function HistoryStrip({
+  previews,
+  current,
+  pinnedRunId,
+  broken,
+  onPick,
+}: {
+  previews: NodePreview[];
+  current: number;
+  pinnedRunId?: string;
+  broken: Set<string>;
+  onPick: (i: number) => void;
+}) {
+  const strip = useRef<HTMLDivElement>(null);
+  // Keep the shown result in view as it changes.
+  useEffect(() => {
+    strip.current?.querySelector<HTMLElement>("[data-current]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [current]);
+
+  return (
+    <div ref={strip} className="nf-res__strip nowheel" role="listbox" aria-label="历史结果">
+      {previews.map((p, idx) => {
+        const m = mediaIn(p.outputs).find((x) => !broken.has(x.path));
+        return (
+          <button
+            key={p.runId}
+            role="option"
+            aria-selected={idx === current}
+            data-current={idx === current || undefined}
+            data-pinned={p.runId === pinnedRunId || undefined}
+            title={`${new Date(p.at).toLocaleString()}${p.runId === pinnedRunId ? "（已选用）" : ""}`}
+            onClick={() => onPick(idx)}
+          >
+            {m && !m.mime.startsWith("video/") ? (
+              <img src={mediaSrc(m)} alt="" draggable={false} loading="lazy" referrerPolicy="no-referrer" />
+            ) : m ? (
+              <video src={mediaSrc(m)} muted preload="metadata" />
+            ) : (
+              <span>{previews.length - idx}</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
