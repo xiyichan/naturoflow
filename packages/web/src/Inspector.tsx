@@ -330,7 +330,7 @@ function WorkflowPanel() {
               <li key={r.id}>
                 <button aria-current={r.id === run?.id || undefined} onClick={() => showRun(r.id)}>
                   <span className="nf-dot" data-status={r.status} />
-                  {new Date(r.startedAt).toLocaleString()}
+                  <span className="nf-runs__time">{shortTime(r.startedAt)}</span>
                   {r.rerunOf && <span className="nf-tag">从 {r.rerunOf.fromNode} 重跑</span>}
                   {r.single && <span className="nf-tag">单独运行 {r.single.nodeId}</span>}
                   <span className="nf-muted">{STATUS_TEXT[r.status]}</span>
@@ -658,4 +658,11 @@ function SingleRunBox({ node, def, beforeRun }: { node: WorkflowNode; def: NodeT
       )}
     </section>
   );
+}
+
+/** Today: time only; otherwise month/day and time. */
+function shortTime(ts: number) {
+  const d = new Date(ts);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.getMonth() + 1}/${d.getDate()} ${time}`;
 }

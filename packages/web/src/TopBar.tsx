@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "./store.ts";
+import { ThemeSwitch } from "./ThemeSwitch.tsx";
 
 export function TopBar() {
   const workflows = useStore((s) => s.workflows);
@@ -58,6 +59,7 @@ export function TopBar() {
 
       <span className="nf-spacer" />
 
+      <ThemeSwitch />
       <span className="nf-sync" data-on={connected || undefined} title={connected ? "画布与服务实时同步，AI 的修改会马上出现" : "与服务断开，正在重连"}>
         {connected ? "实时同步中" : "已断开，重连中"}
       </span>
