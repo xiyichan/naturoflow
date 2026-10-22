@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { freshNodeId } from "./ids.ts";
+import { portCompatible } from "./ports.ts";
 import {
   api,
   ApiError,
@@ -37,6 +39,14 @@ interface State {
   artifactsVersion: number;
   /** Latest single-node run per node of the open workflow (kept apart from the canvas run). */
   singleRuns: Record<string, Run>;
+  /**
+   * Add File nodes for the given files. With `target`, place them left of that node and connect
+   * each to one of its free inputs that accepts a file.
+   */
+  addFileNodes(
+    files: { path: string; name?: string }[],
+    opts: { position?: { x: number; y: number }; target?: string },
+  ): Promise<void>;
   runNode(
     nodeId: string,
     opts?: { fromRunId?: string; inputs?: Record<string, unknown>; params?: "current" | "history"; useCache?: boolean },
@@ -180,6 +190,41 @@ export const useStore = create<State>((set, get) => ({
       set({ logOpen: true });
     } catch (e) {
       get().notify("error", message(e));
+    }
+  },
+
+  async addFileNodes(files, opts) {
+    const wf = get().workflow;
+    if (!wf || !files.length) return;
+    const taken = new Set(wf.nodes.map((n) => n.id));
+    const target = opts.target ? wf.nodes.find((n) => n.id === opts.target) : undefined;
+    // Free inputs of the target that can take a file, in declared order.
+    const free = target
+      ? Object.entries(get().nodeTypes[target.type]?.inputs ?? {})
+          .filter(([port, p]) => portCompatible("file", p.type) && !wf.edges.some((e) => e.to.node === target.id && e.to.port === port))
+          .map(([port]) => port)
+      : [];
+    const origin = target ? { x: target.position.x - 280, y: target.position.y } : (opts.position ?? { x: 0, y: 0 });
+    const ops: PatchOp[] = [];
+    const added: string[] = [];
+    files.forEach((f, i) => {
+      const id = freshNodeId("file", taken);
+      taken.add(id);
+      added.push(id);
+      const name = f.name ?? f.path.split("/").pop() ?? "file";
+      ops.push({ op: "add_node", node: { id, type: "core.file", label: name.slice(0, 40), params: { path: f.path }, position: { x: origin.x, y: origin.y + i * 150 } } });
+      const port = free[i];
+      if (target && port) ops.push({ op: "connect", edge: { from: { node: id, port: "file" }, to: { node: target.id, port } } });
+    });
+    if (await get().patch(ops)) {
+      get().select(added[added.length - 1]);
+      if (target) {
+        const wired = Math.min(free.length, files.length);
+        get().notify(
+          wired ? "info" : "error",
+          wired ? `已接到 ${target.label || target.id} 的 ${free.slice(0, wired).join("、")}` : `${target.label || target.id} 没有空着的文件输入，素材节点已放在它旁边`,
+        );
+      }
     }
   },
 

@@ -1,6 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
-import type { NodeRun, NodeTypeSummary, WorkflowNode } from "./api.ts";
+import { fileUrl, type NodeRun, type NodeTypeSummary, type WorkflowNode } from "./api.ts";
 import { EXECUTOR_LABELS, typeColor, typeLabel } from "./ports.ts";
 
 export type FlowNodeData = {
@@ -56,6 +56,14 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
         )}
       </div>
 
+      {node.type === "core.file" && typeof node.params.path === "string" && (
+        <div className="nf-node__file" title={node.params.path}>
+          {/\.(png|jpe?g|webp|gif|svg)$/i.test(node.params.path) ? (
+            <img src={fileUrl(node.params.path)} alt="" draggable={false} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+          ) : null}
+          <span>{node.params.path.split("/").pop()}</span>
+        </div>
+      )}
       <div className="nf-node__ports">
         <div className="nf-node__col">
           {inputs.map(([name, p]) => (

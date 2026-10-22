@@ -362,6 +362,35 @@ export default async ({ inputs, ctx }) => {
   });
 });
 
+describe("assets", () => {
+  it("core.file feeds an uploaded or generated file into a workflow", async () => {
+    const up = svc.saveUpload("../我的 参考图.png", new Uint8Array([1, 2, 3]));
+    expect(up.path.startsWith(path.join(home, "uploads"))).toBe(true);
+    expect(path.basename(up.path)).toBe("我的 参考图.png");
+    expect(svc.listUploads()[0]).toMatchObject({ path: up.path, name: "我的 参考图.png", mime: "image/png" });
+
+    const run = await svc.runWorkflow({
+      id: "asset",
+      name: "asset",
+      nodes: [
+        { id: "pic", type: "core.file", params: { path: up.path } },
+        js("size", "return inputs.input.size;"),
+      ],
+      edges: [edge("pic", "file", "size", "input")],
+    });
+    expect(run.status).toBe("success");
+    expect(run.nodes.size.outputs?.result).toBe(3);
+
+    const missing = await svc.runWorkflow({ id: "asset2", name: "asset2", nodes: [{ id: "pic", type: "core.file", params: { path: "/nope.png" } }] });
+    expect(missing.nodes.pic.error).toMatch(/file not found/);
+
+    // Cross-workflow listing includes files from every workflow, newest first, no duplicates.
+    const all = svc.listAllArtifacts();
+    expect(new Set(all.map((a) => a.path)).size).toBe(all.length);
+    expect(all.length).toBeGreaterThan(0);
+  });
+});
+
 describe("templated params", () => {
   it("lets params read workflow inputs and node inputs", async () => {
     const run = await svc.runWorkflow(

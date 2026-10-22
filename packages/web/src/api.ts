@@ -128,6 +128,18 @@ export interface NodeRun {
   trace?: { request?: Record<string, unknown>; response?: Record<string, unknown> };
 }
 
+export interface FileRefJson {
+  $file: true;
+  path: string;
+  size: number;
+  mime: string;
+}
+
+export interface UploadedFile extends FileRefJson {
+  name: string;
+  createdAt: number;
+}
+
 export interface Artifact {
   path: string;
   size: number;
@@ -265,6 +277,21 @@ export const api = {
     if (q.starred) qs.set("starred", "1");
     if (q.mime) qs.set("mime", q.mime);
     return req<{ items: Artifact[]; nextBefore?: number }>("GET", `/workflows/${encodeURIComponent(workflowId)}/artifacts?${qs}`);
+  },
+  allArtifacts: (q: { starred?: boolean; mime?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams({ limit: String(q.limit ?? 80) });
+    if (q.starred) qs.set("starred", "1");
+    if (q.mime) qs.set("mime", q.mime);
+    return req<Artifact[]>("GET", `/artifacts?${qs}`);
+  },
+  uploads: () => req<UploadedFile[]>("GET", "/uploads"),
+  async upload(files: File[]): Promise<FileRefJson[]> {
+    const form = new FormData();
+    for (const f of files) form.append("file", f, f.name);
+    const res = await fetch("/api/uploads", { method: "POST", body: form, credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, data.error?.code ?? "ERROR", data.error?.message ?? res.statusText);
+    return data;
   },
   markArtifact: (path: string, mark: { starred?: boolean; note?: string }) =>
     req<{ starred: boolean; note: string }>("PUT", "/artifacts/mark", { path, ...mark }),

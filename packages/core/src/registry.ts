@@ -50,6 +50,19 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     executor: { kind: "builtin", name: "const" },
   },
   {
+    id: "core.file",
+    name: "File",
+    category: "core",
+    description: "A file to feed into the workflow: a generated result, an upload, or any local path.",
+    params: {
+      type: "object",
+      required: ["path"],
+      properties: { path: { type: "string", format: "file-path", description: "本地文件路径（素材面板拖进来时自动填写）" } },
+    },
+    outputs: { file: { type: "file" } },
+    executor: { kind: "builtin", name: "file" },
+  },
+  {
     id: "core.if",
     name: "If",
     category: "core",

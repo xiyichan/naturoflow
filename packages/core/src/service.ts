@@ -8,7 +8,7 @@ import YAML from "yaml";
 import { z } from "zod";
 import { Engine, topoOrder, validateWorkflow, type EngineEvent, type RunOptions, type ValidationIssue } from "./engine.ts";
 import { NodeRegistry } from "./registry.ts";
-import { isFileRef } from "./files.ts";
+import { isFileRef, toFileRef } from "./files.ts";
 import { SecretBox } from "./secrets.ts";
 import { Store } from "./store.ts";
 import {
@@ -752,6 +752,49 @@ export class NaturoflowService extends EventEmitter {
     const marks = this.store.getMarks(items.map((a) => a.path));
     for (const a of items) Object.assign(a, marks.get(a.path) ?? {});
     return { items: this.maskSecrets(items), ...(nextBefore ? { nextBefore } : {}) };
+  }
+
+  /** Generated files across all workflows, newest first (for the canvas asset panel). */
+  listAllArtifacts(opts: { limit?: number; starred?: boolean; mime?: string } = {}): Artifact[] {
+    const limit = Math.min(Math.max(opts.limit ?? 60, 1), 300);
+    // A subflow/map child's file also shows up in its parent workflow: keep the producing entry.
+    const byPath = new Map<string, Artifact>();
+    for (const w of this.store.listWorkflows()) {
+      for (const a of this.listArtifacts(w.id, { ...opts, limit }).items) {
+        const cur = byPath.get(a.path);
+        if (!cur || (cur.nodeType?.startsWith("core.") && !a.nodeType?.startsWith("core."))) byPath.set(a.path, a);
+      }
+    }
+    return [...byPath.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+  }
+
+  get uploadsDir() {
+    return path.join(this.config.home, "uploads");
+  }
+
+  /** Save an uploaded file under <home>/uploads and return it as a FileRef. */
+  saveUpload(name: string, data: Uint8Array): FileRef {
+    const safe = path.basename(name).replace(/[^\w.\-\u4e00-\u9fff ]+/g, "_").slice(-120) || "upload";
+    const dir = path.join(this.uploadsDir, `${Date.now()}-${randomUUID().slice(0, 6)}`);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, safe);
+    fs.writeFileSync(file, data);
+    return toFileRef(file);
+  }
+
+  /** Uploaded files, newest first. */
+  listUploads(limit = 100): (FileRef & { name: string; createdAt: number })[] {
+    if (!fs.existsSync(this.uploadsDir)) return [];
+    return fs
+      .readdirSync(this.uploadsDir)
+      .sort()
+      .reverse()
+      .slice(0, limit)
+      .flatMap((d) => {
+        const dir = path.join(this.uploadsDir, d);
+        if (!fs.statSync(dir).isDirectory()) return [];
+        return fs.readdirSync(dir).map((f) => ({ ...toFileRef(path.join(dir, f)), name: f, createdAt: fs.statSync(dir).mtimeMs }));
+      });
   }
 
   /** Star and/or annotate a produced file (only files under the runs directory). */

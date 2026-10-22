@@ -550,3 +550,27 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
   .nf-app[data-view="gallery"] { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: "top" "gal" "insp"; }
   .nf-cmp__cols { grid-template-columns: 1fr !important; overflow: auto; }
 }
+
+/* ---------- assets panel ---------- */
+.nf-pal__tabs { padding: 0 8px; }
+.nf-assets { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.nf-assets[data-dropping] { outline: 2px dashed var(--run); outline-offset: -6px; }
+.nf-assets__top { padding: 10px 12px 0; display: grid; gap: 8px; }
+.nf-assets__top .nf-seg { justify-self: start; }
+.nf-assets__row { display: flex; align-items: center; gap: 6px; }
+.nf-assets__row .nf-btn { padding-right: 0; }
+.nf-assets__hint { padding: 0 0 8px; }
+.nf-assets__empty { padding: 12px; font-size: 13px; }
+.nf-assets__grid { list-style: none; margin: 0; padding: 8px 12px 16px; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+.nf-assets__item { display: grid; gap: 4px; cursor: grab; border-radius: 6px; padding: 3px; }
+.nf-assets__item:hover, .nf-assets__item:focus-visible { background: var(--panel-2); }
+.nf-assets__media {
+  position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; border-radius: 5px; border: 1px solid var(--line);
+  background: repeating-conic-gradient(var(--panel-2) 0 25%, var(--node) 0 50%) 0 0 / 12px 12px;
+}
+.nf-assets__media img, .nf-assets__media video { width: 100%; height: 100%; object-fit: contain; }
+.nf-assets__star { position: absolute; top: 3px; right: 5px; font-style: normal; color: var(--t-file); font-size: 13px; }
+.nf-assets__cap { font-size: 11.5px; color: var(--ink-2); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.nf-node__file { display: grid; gap: 4px; padding: 6px 10px 0; }
+.nf-node__file img { max-width: 100%; max-height: 120px; object-fit: contain; border-radius: 4px; background: var(--panel-2); justify-self: start; }
+.nf-node__file span { font: 11px var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

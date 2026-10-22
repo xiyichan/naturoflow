@@ -178,6 +178,27 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
       }),
     ),
   );
+  api.get("/artifacts", (c) =>
+    c.json(
+      svc.listAllArtifacts({
+        limit: Number(c.req.query("limit") ?? 60),
+        starred: c.req.query("starred") === "1",
+        mime: c.req.query("mime") || undefined,
+      }),
+    ),
+  );
+  api.get("/uploads", (c) => c.json(svc.listUploads()));
+  api.post("/uploads", async (c) => {
+    const form = await c.req.parseBody({ all: true });
+    const files = ([] as unknown[]).concat(form.file ?? []).filter((f): f is File => f instanceof File);
+    if (!files.length) throw new NfError("INVALID_ARGUMENT", 'send files as multipart field "file"');
+    const saved = [];
+    for (const f of files) {
+      if (f.size > 500 * 1024 * 1024) throw new NfError("TOO_LARGE", `${f.name} is larger than 500 MB`);
+      saved.push(svc.saveUpload(f.name, new Uint8Array(await f.arrayBuffer())));
+    }
+    return c.json(saved, 201);
+  });
   api.put("/artifacts/mark", async (c) => {
     const { path: p, starred, note } = ((await body(c)) ?? {}) as { path?: string; starred?: boolean; note?: string };
     if (!p) throw new NfError("INVALID_ARGUMENT", "path is required");
@@ -211,9 +232,10 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
 
   // Serve run output files (previews); restricted to the runs directory.
   api.get("/files", (c) => {
-    const runsDir = path.resolve(svc.config.home, "runs");
+    // Only run outputs and uploads are served.
+    const roots = [path.resolve(svc.config.home, "runs"), path.resolve(svc.uploadsDir)];
     const p = path.resolve(c.req.query("path") ?? "");
-    if (!p.startsWith(runsDir + path.sep) || !fs.existsSync(p)) throw new NfError("NOT_FOUND", "file not found");
+    if (!roots.some((r) => p.startsWith(r + path.sep)) || !fs.existsSync(p)) throw new NfError("NOT_FOUND", "file not found");
     return new Response(fs.createReadStream(p) as never, { headers: { "content-type": guessMime(p) } });
   });
 

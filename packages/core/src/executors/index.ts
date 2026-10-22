@@ -50,6 +50,12 @@ const BUILTINS: Record<string, (args: ExecArgs) => Promise<Record<string, unknow
   output: async ({ inputs }) => ({ value: inputs.value }),
   /** Pass a constant value. */
   const: async ({ params }) => ({ value: params.value }),
+  /** A local file as a FileRef (the engine checks it exists). */
+  file: async ({ params }) => {
+    const p = String(params.path ?? "").trim();
+    if (!p) throw new Error("params.path is required");
+    return { file: p.startsWith("~/") ? `${process.env.HOME}/${p.slice(2)}` : p };
+  },
 
   /**
    * Route `value` to the `true` or `false` output. `params.condition` is a JS expression

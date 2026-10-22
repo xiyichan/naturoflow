@@ -63,6 +63,21 @@ describe("HTTP auth", () => {
   });
 });
 
+describe("uploads", () => {
+  it("accepts multipart files and serves them back", async () => {
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array([9, 8, 7])], { type: "image/png" }), "ref.png");
+    const res = await fetch(`${srv.url}/api/uploads`, { method: "POST", body: form, headers: { Authorization: `Bearer ${srv.token}` } });
+    expect(res.status).toBe(201);
+    const [ref] = await res.json();
+    expect(ref).toMatchObject({ $file: true, size: 3, mime: "image/png" });
+    const file = await fetch(`${srv.url}/api/files?path=${encodeURIComponent(ref.path)}`, { headers: { Authorization: `Bearer ${srv.token}` } });
+    expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([9, 8, 7]));
+    const outside = await fetch(`${srv.url}/api/files?path=${encodeURIComponent("/etc/hosts")}`, { headers: { Authorization: `Bearer ${srv.token}` } });
+    expect(outside.status).toBe(400);
+  });
+});
+
 describe("MCP over Streamable HTTP", () => {
   it("exposes tools and the node type spec", async () => {
     const { tools } = await client.listTools();

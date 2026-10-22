@@ -12,8 +12,10 @@ import {
   type OnDelete,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, type DragEvent } from "react";
-import type { Edge, PatchOp } from "./api.ts";
+import { api, type Edge, type PatchOp } from "./api.ts";
+import { DND_FILE, type DraggedFile } from "./Assets.tsx";
 import { FlowNode, type FlowNodeType } from "./FlowNode.tsx";
+import { freshNodeId } from "./ids.ts";
 import { portCompatible, typeColor } from "./ports.ts";
 import { useStore } from "./store.ts";
 
@@ -22,12 +24,7 @@ export const DND_TYPE = "application/x-naturoflow-node-type";
 
 const edgeId = (e: Edge) => `${e.from.node}.${e.from.port}->${e.to.node}.${e.to.port}`;
 
-/** Pick a readable, unique node id from the type id, e.g. "ffmpeg.to-gif" -> "to_gif_2". */
-export function freshNodeId(typeId: string, taken: Set<string>) {
-  const base = (typeId.split(".").pop() ?? "node").replace(/[^a-zA-Z0-9_]/g, "_");
-  if (!taken.has(base)) return base;
-  for (let i = 2; ; i++) if (!taken.has(`${base}_${i}`)) return `${base}_${i}`;
-}
+export { freshNodeId } from "./ids.ts";
 
 export function Canvas() {
   const workflow = useStore((s) => s.workflow);
@@ -125,10 +122,33 @@ export function Canvas() {
     [patch, select, selected],
   );
 
+  const addFileNodes = useStore((s) => s.addFileNodes);
+  const notify = useStore((s) => s.notify);
+
   const onDrop = useCallback(
-    (ev: DragEvent) => {
+    async (ev: DragEvent) => {
+      if (!workflow) return;
+      // A file from the asset panel, or files from the desktop: add as File nodes. Dropped on a
+      // node, they are wired into that node's first free file input.
+      const fileJson = ev.dataTransfer.getData(DND_FILE);
+      const osFiles = [...ev.dataTransfer.files];
+      if (fileJson || osFiles.length) {
+        ev.preventDefault();
+        const target = (ev.target as HTMLElement).closest(".react-flow__node")?.getAttribute("data-id") ?? undefined;
+        const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY });
+        let files: DraggedFile[] = fileJson ? [JSON.parse(fileJson)] : [];
+        if (osFiles.length) {
+          try {
+            files = (await api.upload(osFiles)).map((f) => ({ path: f.path, mime: f.mime, name: f.path.split("/").pop() ?? "file" }));
+          } catch (e) {
+            return notify("error", `上传失败：${(e as Error).message}`);
+          }
+        }
+        await addFileNodes(files, { position: { x: Math.round(p.x), y: Math.round(p.y) }, target });
+        return;
+      }
       const typeId = ev.dataTransfer.getData(DND_TYPE);
-      if (!typeId || !workflow) return;
+      if (!typeId) return;
       ev.preventDefault();
       const id = freshNodeId(typeId, new Set(workflow.nodes.map((n) => n.id)));
       const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY });
@@ -136,7 +156,7 @@ export function Canvas() {
         (ok) => ok && select(id),
       );
     },
-    [workflow, patch, select, screenToFlowPosition],
+    [workflow, patch, select, screenToFlowPosition, addFileNodes, notify],
   );
 
   if (!workflow) {
@@ -163,7 +183,7 @@ export function Canvas() {
       onNodeClick={(_, n) => select(n.id)}
       onPaneClick={() => select(null)}
       onDragOver={(ev) => {
-        if (ev.dataTransfer.types.includes(DND_TYPE)) {
+        if ([DND_TYPE, DND_FILE, "Files"].some((t) => ev.dataTransfer.types.includes(t))) {
           ev.preventDefault();
           ev.dataTransfer.dropEffect = "copy";
         }

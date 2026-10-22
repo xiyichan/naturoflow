@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type { NodeTypeSummary } from "./api.ts";
-import { DND_TYPE, freshNodeId } from "./Canvas.tsx";
+import { Assets } from "./Assets.tsx";
+import { DND_TYPE } from "./Canvas.tsx";
+import { freshNodeId } from "./ids.ts";
 import { EXECUTOR_LABELS, typeColor } from "./ports.ts";
 import { useStore } from "./store.ts";
 
@@ -31,6 +33,8 @@ export function Palette() {
   const select = useStore((s) => s.select);
   const setEditor = useStore((s) => s.setEditor);
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState<"nodes" | "assets">("nodes");
+  const addFileNodes = useStore((s) => s.addFileNodes);
 
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -51,8 +55,30 @@ export function Palette() {
     if (await patch([{ op: "add_node", node: { id, type: t.id, params: {}, position: { x: maxX + 300, y: 80 } } }])) select(id);
   };
 
+  const tabs = (
+    <div className="nf-tabs nf-pal__tabs" role="tablist">
+      <button role="tab" aria-selected={tab === "nodes"} onClick={() => setTab("nodes")}>
+        节点
+      </button>
+      <button role="tab" aria-selected={tab === "assets"} onClick={() => setTab("assets")}>
+        素材
+      </button>
+    </div>
+  );
+
+  if (tab === "assets") {
+    const maxX = Math.max(0, ...(workflow?.nodes ?? []).map((n) => n.position.x));
+    return (
+      <aside className="nf-pal" aria-label="素材">
+        {tabs}
+        <Assets onAdd={(files) => addFileNodes(files, { position: { x: maxX + 300, y: 80 } })} />
+      </aside>
+    );
+  }
+
   return (
     <aside className="nf-pal" aria-label="节点库">
+      {tabs}
       <div className="nf-pal__top">
         <input
           className="nf-input"
