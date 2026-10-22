@@ -2,7 +2,8 @@ id: s3.upload
 name: S3 上传
 category: network
 description: >-
-  把文件上传到 S3 或兼容 S3 的对象存储（可当图床），返回公开链接和预签名下载链接。
+  把文件上传到 S3 或兼容 S3 的对象存储（可当图床）。url 默认返回预签名链接（私有 bucket 也能打开，最长 7 天），
+  公开地址在 public_url。
   支持一个文件或一组文件（比如 Seedream 的 files 输出）。签名用 SigV4，默认 path-style 地址。
 credentials:
   type: s3
@@ -60,27 +61,32 @@ params:
     cache_control:
       type: string
       description: 例如 public, max-age=31536000
-    presign:
-      type: boolean
-      default: true
-      description: 同时生成预签名下载链接（bucket 不公开时也能访问）
+    url_type:
+      type: string
+      enum: [presigned, public]
+      default: presigned
+      description: url 输出用哪种链接。presigned（默认）：预签名链接，私有 bucket 也能打开，到期失效；public：对象的公开地址，需要 bucket 或对象可公开读取
     presign_expires:
       type: integer
       default: 604800
       minimum: 1
       maximum: 604800
-      description: 预签名链接有效期（秒），最长 7 天
+      description: 预签名链接有效期（秒），最长 7 天（604800）
 outputs:
   url:
     type: string
-    description: 第一个文件的公开链接
+    description: 第一个文件的链接（默认是预签名链接，见参数 url_type），可直接交给 Seedream 等节点
   urls:
     type: list<string>
   presigned_url:
     type: string
-    required: false
     description: 第一个文件的预签名下载链接
   presigned_urls:
+    type: list<string>
+  public_url:
+    type: string
+    description: 第一个文件的公开地址（bucket 私有时打不开）
+  public_urls:
     type: list<string>
   keys:
     type: list<string>

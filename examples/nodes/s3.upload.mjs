@@ -48,6 +48,7 @@ export default async ({ inputs, params, ctx }) => {
   const template = params.key || "naturoflow/{date}/{name}-{uuid}.{ext}";
   const now = new Date();
   const uploads = [];
+  const urlType = params.url_type === "public" ? "public" : "presigned";
 
   for (const [i, f] of files.entries()) {
     if (!fs.existsSync(f.path)) throw new Error(`file not found: ${f.path}`);
@@ -75,16 +76,20 @@ export default async ({ inputs, params, ctx }) => {
 
     // Public URL: a configured public base (CDN / custom domain) or the object's own URL.
     const publicUrl = c.public_base_url ? `${c.public_base_url.replace(/\/+$/, "")}/${url.pathname.split("/").slice(pathStyle ? 2 : 1).join("/")}` : url.toString();
-    const presigned = params.presign === false ? undefined : presignGet({ url: url.toString(), accessKeyId, secretAccessKey, region, expires: Number(params.presign_expires ?? 604800) });
-    uploads.push({ bucket, key, url: publicUrl, ...(presigned ? { presigned_url: presigned } : {}), etag: res.headers.get("etag") ?? undefined, size: body.length, content_type: headers["content-type"], file: f.path });
-    ctx.log(`uploaded ${key} -> ${publicUrl}`);
+    const presigned = presignGet({ url: url.toString(), accessKeyId, secretAccessKey, region, expires: Number(params.presign_expires ?? 604800) });
+    // Private buckets (the common case) can only be read through a presigned link.
+    const main = urlType === "public" ? publicUrl : presigned;
+    uploads.push({ bucket, key, url: main, public_url: publicUrl, presigned_url: presigned, etag: res.headers.get("etag") ?? undefined, size: body.length, content_type: headers["content-type"], file: f.path });
+    ctx.log(`uploaded ${key} -> ${urlType === "public" ? publicUrl : `${publicUrl} (presigned link, valid ${Number(params.presign_expires ?? 604800)}s)`}`);
   }
 
   return {
     url: uploads[0].url,
     urls: uploads.map((u) => u.url),
+    public_url: uploads[0].public_url,
+    public_urls: uploads.map((u) => u.public_url),
     presigned_url: uploads[0].presigned_url,
-    presigned_urls: uploads.map((u) => u.presigned_url).filter(Boolean),
+    presigned_urls: uploads.map((u) => u.presigned_url),
     keys: uploads.map((u) => u.key),
     uploads,
   };

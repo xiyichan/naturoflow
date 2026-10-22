@@ -121,7 +121,10 @@ describe("s3.upload node", () => {
     expect(r.status).toBe("success");
     const out = r.nodes.up.outputs!;
     expect(out.keys).toEqual(["img/cat 猫.png"]);
-    expect(out.url).toBe(`${endpoint}/pics/img/cat%20%E7%8C%AB.png`);
+    expect(out.public_url).toBe(`${endpoint}/pics/img/cat%20%E7%8C%AB.png`);
+    // By default `url` is the presigned link, which works for private buckets.
+    expect(out.url).toBe(out.presigned_url);
+    expect(String(out.url).startsWith(`${endpoint}/pics/img/cat%20%E7%8C%AB.png?X-Amz-Algorithm=AWS4-HMAC-SHA256`)).toBe(true);
     const obj = stored.get("/pics/img/cat 猫.png")!;
     expect(obj.body.toString()).toBe("PNGDATA");
     expect(obj.headers["content-type"]).toBe("image/png");
@@ -133,10 +136,10 @@ describe("s3.upload node", () => {
 
   it("uploads every file of a list and uses the public base URL", async () => {
     const cdn = svc.createCredential({ type: "s3", name: "cdn", data: { access_key_id: "AKIDTEST", secret_access_key: SECRET, endpoint, bucket: "pics", public_base_url: "https://img.example.com/" } }).id;
-    const r = await run([fileRef("a.png", "A"), fileRef("b.png", "B")], { key: "batch/{index}-{name}.{ext}", presign: false }, cdn);
+    const r = await run([fileRef("a.png", "A"), fileRef("b.png", "B")], { key: "batch/{index}-{name}.{ext}", url_type: "public" }, cdn);
     expect(r.status).toBe("success");
     expect(r.nodes.up.outputs!.urls).toEqual(["https://img.example.com/batch/1-a.png", "https://img.example.com/batch/2-b.png"]);
-    expect(r.nodes.up.outputs!.presigned_urls).toEqual([]);
+    expect(r.nodes.up.outputs!.presigned_urls).toHaveLength(2);
   });
 
   it("reports S3 errors and a missing bucket clearly", async () => {
