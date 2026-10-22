@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NaturoflowService, portCompatible, render, type WorkflowInput } from "../src/index.ts";
+import { pruneUnset } from "../src/executors/http.ts";
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "naturoflow-test-"));
 const examples = path.resolve(import.meta.dirname, "../../../examples/nodes");
@@ -42,6 +43,14 @@ describe("template", () => {
     expect(render("x={{a.b[1]}}", { a: { b: [1, 2] } })).toBe("x=2");
     expect(render({ k: ["{{n | default: 5}}"] }, {})).toEqual({ k: [5] });
     expect(render("{{s | fromjson | get:'x.y'}}", { s: '{"x":{"y":3}}' })).toBe(3);
+  });
+});
+
+describe("request bodies", () => {
+  it("drop unset (null/undefined) fields and objects emptied by that", () => {
+    expect(
+      pruneUnset({ a: 1, b: undefined, c: null, d: { e: undefined }, f: {}, g: [null, 1], h: false, i: "", j: { k: 2, l: null } }),
+    ).toEqual({ a: 1, f: {}, g: [null, 1], h: false, i: "", j: { k: 2 } });
   });
 });
 

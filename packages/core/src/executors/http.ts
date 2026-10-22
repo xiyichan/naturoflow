@@ -22,7 +22,7 @@ export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string
   if (spec.body !== undefined && method !== "GET" && method !== "HEAD") {
     const b = render(spec.body, scope);
     if (spec.bodyType === "json") {
-      body = JSON.stringify(b);
+      body = JSON.stringify(pruneUnset(b));
       if (!headers.has("content-type")) headers.set("content-type", "application/json");
     } else if (spec.bodyType === "form") {
       body = new URLSearchParams(b as Record<string, string>);
@@ -67,4 +67,21 @@ export function mapOutputs(
 ): Record<string, unknown> {
   if (!outputs) return fallback;
   return Object.fromEntries(Object.entries(outputs).map(([port, tpl]) => [port, render(tpl, scope)]));
+}
+
+/**
+ * Drop fields whose value is null/undefined (unset optional params), and objects left empty by
+ * that, so APIs only receive the fields the user actually set. Array items are kept as-is.
+ */
+export function pruneUnset(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(pruneUnset);
+  if (!v || typeof v !== "object") return v;
+  const out: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (x === undefined || x === null) continue;
+    const pruned = pruneUnset(x);
+    const emptied = pruned && typeof pruned === "object" && !Array.isArray(pruned) && Object.keys(pruned).length === 0 && Object.keys(x as object).length > 0;
+    if (!emptied) out[k] = pruned;
+  }
+  return out;
 }

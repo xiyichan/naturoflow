@@ -61,13 +61,27 @@ function Field({
     control = <WorkflowPicker id={id} value={shown} onChange={onChange} />;
   } else if (schema.enum) {
     control = (
-      <select id={id} className="nf-input" value={String(shown ?? "")} onChange={(e) => onChange(e.target.value)}>
-        {!required && <option value="">（未设置）</option>}
+      <select id={id} className="nf-input" value={String(shown ?? "")} onChange={(e) => onChange(e.target.value || undefined)}>
+        {(!required || schema.default === undefined) && <option value="">（未设置）</option>}
         {schema.enum.map((o) => (
           <option key={String(o)} value={String(o)}>
             {String(o)}
           </option>
         ))}
+      </select>
+    );
+  } else if (schema.type === "boolean" && schema.default === undefined) {
+    // No default: "not set" must be distinguishable from false, so the API's own default applies.
+    control = (
+      <select
+        id={id}
+        className="nf-input"
+        value={shown === undefined ? "" : String(shown)}
+        onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "true")}
+      >
+        <option value="">（未设置）</option>
+        <option value="true">是</option>
+        <option value="false">否</option>
       </select>
     );
   } else if (schema.type === "boolean") {
@@ -78,10 +92,12 @@ function Field({
     control = <NumberInput id={id} value={shown} integer={schema.type === "integer"} onChange={onChange} />;
   } else if (schema.type === "string") {
     const long = name === "code" || (typeof shown === "string" && (shown.length > 60 || shown.includes("\n")));
+    // An emptied field means "not set" (the default applies / the field is left out of requests).
+    const set = (v: string) => onChange(v === "" ? undefined : v);
     control = long ? (
-      <textarea id={id} className="nf-input nf-code" rows={6} spellCheck={false} value={String(shown ?? "")} onChange={(e) => onChange(e.target.value)} />
+      <textarea id={id} className="nf-input nf-code" rows={6} spellCheck={false} value={String(shown ?? "")} onChange={(e) => set(e.target.value)} />
     ) : (
-      <input id={id} className="nf-input" value={String(shown ?? "")} onChange={(e) => onChange(e.target.value)} />
+      <input id={id} className="nf-input" value={String(shown ?? "")} placeholder={schema.default === undefined ? "未设置" : undefined} onChange={(e) => set(e.target.value)} />
     );
   } else {
     control = <JsonInput id={id} value={shown} onChange={onChange} />;
