@@ -423,6 +423,35 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
   );
 
   server.registerTool(
+    "list_artifacts",
+    {
+      title: "List generated files",
+      description:
+        "Files (images, videos, audio…) produced by a workflow's runs, newest first, each with the node that created it, its params at the time (e.g. the prompt), and the user's star/note. Use it to look back at earlier results or compare attempts. Page with `before` = nextBefore.",
+      inputSchema: {
+        workflowId,
+        limit: z.number().int().min(1).max(100).default(20),
+        before: z.number().optional(),
+        nodeId: z.string().optional(),
+        starred: z.boolean().optional().describe("only files the user starred"),
+        mime: z.string().optional().describe('mime prefix filter, e.g. "image/" or "video/"'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    wrap(({ workflowId, ...opts }) => svc.listArtifacts(workflowId, opts)),
+  );
+
+  server.registerTool(
+    "mark_artifact",
+    {
+      title: "Star or annotate a generated file",
+      description: "Star a generated file and/or set a note on it (shown in the user's gallery).",
+      inputSchema: { path: z.string(), starred: z.boolean().optional(), note: z.string().optional() },
+    },
+    wrap(({ path, starred, note }) => svc.markArtifact(path, { starred, note })),
+  );
+
+  server.registerTool(
     "get_node_history",
     {
       title: "Get node history",

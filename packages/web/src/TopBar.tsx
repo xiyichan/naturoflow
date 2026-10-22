@@ -13,6 +13,8 @@ export function TopBar() {
   const startRun = useStore((s) => s.startRun);
   const cancelRun = useStore((s) => s.cancelRun);
   const select = useStore((s) => s.select);
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
   const [askInputs, setAskInputs] = useState(false);
 
   const running = run?.status === "running" && run.workflowId === workflow?.id;
@@ -34,6 +36,16 @@ export function TopBar() {
           </option>
         ))}
       </select>
+      {workflow && (
+        <div className="nf-seg nf-top__views" role="tablist" aria-label="视图">
+          <button role="tab" aria-selected={view === "canvas"} onClick={() => setView("canvas")}>
+            画布
+          </button>
+          <button role="tab" aria-selected={view === "gallery"} onClick={() => setView("gallery")}>
+            生成结果
+          </button>
+        </div>
+      )}
       <button
         className="nf-btn nf-btn--ghost"
         onClick={() => {
@@ -55,7 +67,10 @@ export function TopBar() {
           <button
             className="nf-btn nf-btn--ghost"
             data-warn={issues.length > 0 || undefined}
-            onClick={() => select(null)}
+            onClick={() => {
+              setView("canvas");
+              select(null);
+            }}
             title="在右侧查看检查结果"
           >
             {issues.length ? `${issues.length} 个问题` : "检查通过"}

@@ -256,6 +256,112 @@ describe("single-node runs", () => {
   });
 });
 
+describe("artifacts", () => {
+  it("lists produced files once, attributed to the producing node, with stars and notes", async () => {
+    svc.saveNodeType({
+      id: "test.make-file",
+      name: "make file",
+      cache: true,
+      params: { type: "object", properties: { text: { type: "string" } } },
+      outputs: { file: { type: "file" } },
+      executor: {
+        kind: "script",
+        language: "js",
+        code: `import fs from "node:fs";
+export default async ({ params, ctx }) => {
+  const p = ctx.outDir + "/out.png";
+  fs.writeFileSync(p, params.text);
+  return { file: p };
+};`,
+      },
+    });
+    const make = (text: string) =>
+      svc.saveWorkflow({
+        id: "gallery",
+        name: "gallery",
+        nodes: [
+          { id: "maker", type: "test.make-file", params: { text } },
+          { id: "out", type: "core.output", params: { key: "img" } },
+        ],
+        edges: [edge("maker", "file", "out", "value")],
+      });
+    make("first");
+    const r1 = await svc.runWorkflow("gallery");
+    make("second");
+    await svc.runWorkflow("gallery");
+    await svc.runWorkflow("gallery"); // cache hit: same file, not a new artifact
+
+    const { items } = svc.listArtifacts("gallery");
+    expect(items).toHaveLength(2);
+    expect(items.map((a) => a.nodeId)).toEqual(["maker", "maker"]);
+    expect(items.map((a) => a.params?.text)).toEqual(["second", "first"]);
+    expect(items[0]).toMatchObject({ port: "file", mime: "image/png", starred: false, note: "" });
+
+    // Lineage: a downstream copy step still shows the producer's params.
+    svc.saveWorkflow({
+      id: "gallery2",
+      name: "gallery2",
+      nodes: [
+        { id: "maker", type: "test.make-file", params: { text: "prompt-a" } },
+        { id: "copy", type: "js.transform", params: { code: "return inputs.input;" } },
+      ],
+      edges: [edge("maker", "file", "copy", "input")],
+    });
+    await svc.runWorkflow("gallery2", {}, { useCache: false });
+    const g2 = svc.listArtifacts("gallery2").items;
+    expect(g2).toHaveLength(1); // the copy passes the same file through; attributed to maker
+    expect(g2[0].nodeId).toBe("maker");
+    const copyRun = await svc.runSingleNode("gallery2", "copy");
+    expect(copyRun.status).toBe("success");
+
+    // Like Seedream -> download: the downstream node makes a new file; its lineage shows the prompt.
+    svc.saveNodeType({
+      id: "test.copy-file",
+      name: "copy file",
+      inputs: { file: { type: "file" } },
+      outputs: { file: { type: "file" } },
+      executor: {
+        kind: "script",
+        language: "js",
+        code: `import fs from "node:fs";
+export default async ({ inputs, ctx }) => {
+  const p = ctx.outDir + "/copy.png";
+  fs.copyFileSync(inputs.file.path, p);
+  return { file: p };
+};`,
+      },
+    });
+    svc.saveWorkflow({
+      id: "gallery3",
+      name: "gallery3",
+      nodes: [
+        { id: "gen", type: "test.make-file", params: { text: "prompt-b" } },
+        { id: "dl", type: "test.copy-file" },
+      ],
+      edges: [edge("gen", "file", "dl", "file")],
+    });
+    await svc.runWorkflow("gallery3", {}, { useCache: false });
+    await svc.runSingleNode("gallery3", "dl");
+    const g3 = svc.listArtifacts("gallery3", { nodeId: "dl" }).items;
+    expect(g3).toHaveLength(2);
+    for (const a of g3) expect(a.lineage).toEqual([{ nodeId: "gen", nodeType: "test.make-file", params: { text: "prompt-b" } }]);
+    expect(g3[0].single?.nodeId).toBe("dl");
+
+    svc.markArtifact(items[1].path, { starred: true, note: "better colors" });
+    const starred = svc.listArtifacts("gallery", { starred: true }).items;
+    expect(starred).toHaveLength(1);
+    expect(starred[0]).toMatchObject({ runId: r1.id, starred: true, note: "better colors" });
+    expect(svc.listArtifacts("gallery", { nodeId: "out" }).items).toHaveLength(0);
+    expect(() => svc.markArtifact("/etc/passwd", { starred: true })).toThrow(/not a run output/);
+
+    // Deleted files drop out; paging returns the rest.
+    fs.rmSync(items[0].path);
+    expect(svc.listArtifacts("gallery").items.map((a) => a.params?.text)).toEqual(["first"]);
+    const page = svc.listArtifacts("gallery", { limit: 1 });
+    expect(page.items).toHaveLength(1);
+  });
+});
+
 describe("templated params", () => {
   it("lets params read workflow inputs and node inputs", async () => {
     const run = await svc.runWorkflow(

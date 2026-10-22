@@ -31,6 +31,10 @@ interface State {
   logOpen: boolean;
   /** Bumped whenever saved credentials change, so pickers refetch. */
   credVersion: number;
+  view: "canvas" | "gallery";
+  setView(v: "canvas" | "gallery"): void;
+  /** Bumped when a run of the open workflow finishes, so the gallery refetches. */
+  artifactsVersion: number;
   /** Latest single-node run per node of the open workflow (kept apart from the canvas run). */
   singleRuns: Record<string, Run>;
   runNode(
@@ -93,6 +97,11 @@ export const useStore = create<State>((set, get) => ({
   logOpen: false,
   credVersion: 0,
   singleRuns: {},
+  view: "canvas",
+  artifactsVersion: 0,
+  setView(view) {
+    set({ view });
+  },
 
   async init() {
     try {
@@ -291,6 +300,7 @@ export const useStore = create<State>((set, get) => ({
         break;
       }
       case "run.finished":
+        if (e.run.workflowId === wfId) set({ artifactsVersion: get().artifactsVersion + 1 });
         if (e.run.single) {
           if (e.run.workflowId === wfId) {
             set({ singleRuns: { ...s.singleRuns, [e.run.single.nodeId]: e.run } });

@@ -22,6 +22,10 @@ export class Store {
         id TEXT PRIMARY KEY, type TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL,
         fields TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS artifact_marks (
+        path TEXT PRIMARY KEY, starred INTEGER NOT NULL DEFAULT 0, note TEXT NOT NULL DEFAULT '',
+        updated_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS node_cache (
         key TEXT PRIMARY KEY, json TEXT NOT NULL, created_at INTEGER NOT NULL
       );
@@ -152,6 +156,44 @@ export class Store {
       ...(r.single ? { single: JSON.parse(String(r.single)) } : {}),
       node: JSON.parse(String(r.node)),
     }));
+  }
+
+  /** Full run records of a workflow, newest first (for building the artifact gallery). */
+  runsOf(workflowId: string, before = Number.MAX_SAFE_INTEGER, limit = 100): RunRecord[] {
+    return (
+      this.db
+        .prepare("SELECT json FROM runs WHERE workflow_id = ? AND started_at < ? ORDER BY started_at DESC LIMIT ?")
+        .all(workflowId, before, limit) as { json: string }[]
+    ).map((r) => JSON.parse(r.json));
+  }
+
+  getMarks(paths: string[]): Map<string, { starred: boolean; note: string }> {
+    const out = new Map<string, { starred: boolean; note: string }>();
+    if (!paths.length) return out;
+    const rows = this.db
+      .prepare(`SELECT path, starred, note FROM artifact_marks WHERE path IN (${paths.map(() => "?").join(",")})`)
+      .all(...paths) as { path: string; starred: number; note: string }[];
+    for (const r of rows) out.set(r.path, { starred: !!r.starred, note: r.note });
+    return out;
+  }
+
+  starredPaths(): Set<string> {
+    return new Set((this.db.prepare("SELECT path FROM artifact_marks WHERE starred = 1").all() as { path: string }[]).map((r) => r.path));
+  }
+
+  setMark(path: string, mark: { starred?: boolean; note?: string }): { starred: boolean; note: string } {
+    const cur = this.getMarks([path]).get(path) ?? { starred: false, note: "" };
+    const next = { starred: mark.starred ?? cur.starred, note: mark.note ?? cur.note };
+    if (!next.starred && !next.note) this.db.prepare("DELETE FROM artifact_marks WHERE path = ?").run(path);
+    else {
+      this.db
+        .prepare(
+          `INSERT INTO artifact_marks (path, starred, note, updated_at) VALUES (?, ?, ?, ?)
+           ON CONFLICT(path) DO UPDATE SET starred = excluded.starred, note = excluded.note, updated_at = excluded.updated_at`,
+        )
+        .run(path, next.starred ? 1 : 0, next.note, Date.now());
+    }
+    return next;
   }
 
   getNodeRun(runId: string, nodeId: string): NodeRunRecord | undefined {

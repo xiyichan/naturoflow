@@ -8,12 +8,14 @@ import YAML from "yaml";
 import { z } from "zod";
 import { Engine, topoOrder, validateWorkflow, type EngineEvent, type RunOptions, type ValidationIssue } from "./engine.ts";
 import { NodeRegistry } from "./registry.ts";
+import { isFileRef } from "./files.ts";
 import { SecretBox } from "./secrets.ts";
 import { Store } from "./store.ts";
 import {
   NfError,
   ToolPublish,
   credentialTypeOf,
+  type FileRef,
   Workflow,
   WorkflowEdge,
   WorkflowNode,
@@ -92,6 +94,30 @@ export const PatchOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_tool"), tool: ToolPublish.nullable() }),
 ]);
 export type PatchOp = z.input<typeof PatchOp>;
+
+/** A file produced by a workflow run, with what produced it. */
+export interface Artifact {
+  path: string;
+  size: number;
+  mime: string;
+  runId: string;
+  runStartedAt: number;
+  runStatus: RunRecord["status"];
+  single?: RunRecord["single"];
+  rerunOf?: RunRecord["rerunOf"];
+  nodeId: string;
+  nodeType?: string;
+  nodeLabel?: string;
+  /** Output port, e.g. "files[2]" or "results[0].gif". */
+  port: string;
+  createdAt: number;
+  /** The producing node's params at the time (secrets masked). */
+  params?: Record<string, unknown>;
+  /** Upstream nodes in the same run and their params at the time, nearest first (e.g. the prompt). */
+  lineage?: { nodeId: string; nodeType?: string; nodeLabel?: string; params?: Record<string, unknown> }[];
+  starred: boolean;
+  note: string;
+}
 
 /** A saved credential as shown to the UI / MCP: never includes secret values. */
 export interface CredentialInfo {
@@ -640,6 +666,102 @@ export class NaturoflowService extends EventEmitter {
     return JSON.parse(text);
   }
 
+  /**
+   * Files this workflow's runs produced, newest first. Each file appears once, attributed to the
+   * node that created it (not to cached/reused copies or core.* pass-through nodes). Files that
+   * were deleted from disk are left out.
+   */
+  listArtifacts(
+    workflowId: string,
+    opts: { limit?: number; before?: number; nodeId?: string; starred?: boolean; mime?: string } = {},
+  ): { items: Artifact[]; nextBefore?: number } {
+    const wf = this.getWorkflow(workflowId);
+    const limit = Math.min(Math.max(opts.limit ?? 60, 1), 500);
+    const starred = opts.starred ? this.store.starredPaths() : undefined;
+    const byPath = new Map<string, Artifact>();
+    const score = (a: Artifact) => (a.nodeType?.startsWith("core.") ? 0 : 1);
+    let before = opts.before ?? Number.MAX_SAFE_INTEGER;
+    let nextBefore: number | undefined;
+
+    scan: while (true) {
+      const runs = this.store.runsOf(workflowId, before, 50);
+      if (!runs.length) break;
+      for (const run of runs) {
+        // A single-node run's upstream ran in the run its inputs came from — possibly through a
+        // chain of replays — so follow fromRunId until the node's record turns up.
+        const recordOf = (id: string) => {
+          let r: RunRecord | undefined = run;
+          for (let hops = 0; r && hops < 8; hops++) {
+            if (r.nodes[id]) return r.nodes[id];
+            r = r.single?.fromRunId ? this.store.getRun(r.single.fromRunId) : undefined;
+          }
+          return undefined;
+        };
+        const lineageOf = (nodeId: string) =>
+          upstreamOf(wf, nodeId)
+            .map((id) => {
+              const rec = recordOf(id);
+              const n = wf.nodes.find((x) => x.id === id);
+              if (!n || n.type.startsWith("core.")) return undefined;
+              return { nodeId: id, nodeType: n.type, ...(n.label ? { nodeLabel: n.label } : {}), ...(rec?.params ? { params: rec.params } : {}) };
+            })
+            .filter((x): x is NonNullable<typeof x> => !!x);
+        for (const nr of Object.values(run.nodes)) {
+          if (nr.status !== "success" || nr.cached || !nr.outputs) continue;
+          const node = wf.nodes.find((n) => n.id === nr.nodeId);
+          for (const { ref, port } of fileRefsIn(nr.outputs)) {
+            if (starred && !starred.has(ref.path)) continue;
+            if (opts.mime && !ref.mime.startsWith(opts.mime)) continue;
+            if (!byPath.has(ref.path) && !fs.existsSync(ref.path)) continue;
+            const a: Artifact = {
+              path: ref.path,
+              size: ref.size,
+              mime: ref.mime,
+              runId: run.id,
+              runStartedAt: run.startedAt,
+              runStatus: run.status,
+              ...(run.single ? { single: run.single } : {}),
+              ...(run.rerunOf ? { rerunOf: run.rerunOf } : {}),
+              nodeId: nr.nodeId,
+              nodeType: node?.type,
+              ...(node?.label ? { nodeLabel: node.label } : {}),
+              port,
+              createdAt: nr.finishedAt ?? run.startedAt,
+              ...(nr.params ? { params: nr.params } : {}),
+              lineage: lineageOf(nr.nodeId),
+              starred: false,
+              note: "",
+            };
+            const cur = byPath.get(ref.path);
+            if (!cur || score(a) > score(cur)) byPath.set(ref.path, a);
+          }
+        }
+        before = run.startedAt;
+        if (byPath.size >= limit) {
+          nextBefore = run.startedAt;
+          break scan;
+        }
+      }
+      if (runs.length < 50) break;
+    }
+
+    // Filter by node only after attribution, so a pass-through copy never stands in for its producer.
+    const items = [...byPath.values()]
+      .filter((a) => !opts.nodeId || a.nodeId === opts.nodeId)
+      .sort((x, y) => y.createdAt - x.createdAt);
+    const marks = this.store.getMarks(items.map((a) => a.path));
+    for (const a of items) Object.assign(a, marks.get(a.path) ?? {});
+    return { items: this.maskSecrets(items), ...(nextBefore ? { nextBefore } : {}) };
+  }
+
+  /** Star and/or annotate a produced file (only files under the runs directory). */
+  markArtifact(filePath: string, mark: { starred?: boolean; note?: string }) {
+    const runsDir = path.resolve(this.config.home, "runs");
+    const abs = path.resolve(filePath);
+    if (!abs.startsWith(runsDir + path.sep)) throw new NfError("INVALID_ARGUMENT", "not a run output file");
+    return this.store.setMark(abs, { ...mark, ...(mark.note !== undefined ? { note: mark.note.slice(0, 2000) } : {}) });
+  }
+
   listRuns(workflowId?: string, limit?: number) {
     return this.store.listRuns(workflowId, limit);
   }
@@ -653,4 +775,33 @@ export class NaturoflowService extends EventEmitter {
     for (const w of this.watchers) w.close();
     this.store.close();
   }
+}
+
+/** Every FileRef inside a value, with a readable path like "files[2]" or "results[0].gif". */
+function fileRefsIn(value: unknown, at = ""): { ref: FileRef; port: string }[] {
+  if (isFileRef(value)) return [{ ref: value, port: at }];
+  if (Array.isArray(value)) return value.flatMap((v, i) => fileRefsIn(v, `${at}[${i}]`));
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([k, v]) => fileRefsIn(v, at ? `${at}.${k}` : k));
+  }
+  return [];
+}
+
+/** Ancestors of a node through the workflow's edges, nearest first. */
+function upstreamOf(wf: Workflow, nodeId: string): string[] {
+  const out: string[] = [];
+  let frontier = [nodeId];
+  while (frontier.length) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const e of wf.edges) {
+        if (e.to.node === id && !out.includes(e.from.node) && e.from.node !== nodeId) {
+          out.push(e.from.node);
+          next.push(e.from.node);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }

@@ -468,3 +468,85 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 .nf-single .nf-btn--primary { justify-self: start; }
 .nf-single__result { margin-top: 6px; padding: 10px; background: var(--node); border: 1px solid var(--line); border-radius: 8px; }
 .nf-single__result > .nf-muted { margin: 0 0 6px; font-size: 12px; }
+
+/* ---------- gallery (生成结果) ---------- */
+.nf-app[data-view="gallery"] {
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 52px 1fr;
+  grid-template-areas: "top top" "gal insp";
+}
+.nf-gal { grid-area: gal; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+.nf-seg { display: inline-flex; background: var(--panel-2); border-radius: 7px; padding: 2px; }
+.nf-seg button { font: 500 12.5px var(--sans); color: var(--ink-2); background: none; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; }
+.nf-seg button[aria-checked="true"], .nf-seg button[aria-selected="true"] { background: var(--node); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 25, 40, 0.12); }
+.nf-top__views { margin-left: 4px; }
+.nf-gal__bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+.nf-gal__count { font-weight: 600; font-size: 13px; }
+.nf-gal__node { width: auto; min-width: 140px; }
+.nf-gal__star-filter { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.nf-gal__grid {
+  list-style: none; margin: 0; padding: 16px; overflow: auto; flex: 1;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; align-content: start;
+}
+.nf-gal__grid > li { position: relative; }
+.nf-gal__card {
+  width: 100%; display: grid; gap: 4px; padding: 0 0 8px; text-align: left; cursor: pointer;
+  background: var(--node); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; overflow: hidden;
+}
+.nf-gal__grid > li[data-selected] .nf-gal__card { border-color: var(--act); box-shadow: 0 0 0 2px color-mix(in srgb, var(--act) 30%, transparent); }
+.nf-gal__grid > li[data-picked] .nf-gal__card { border-color: var(--run); }
+.nf-gal__media {
+  display: grid; place-items: center; aspect-ratio: 1; overflow: hidden;
+  background: repeating-conic-gradient(var(--panel-2) 0 25%, var(--node) 0 50%) 0 0 / 16px 16px;
+}
+.nf-gal__media img, .nf-gal__media video { width: 100%; height: 100%; object-fit: contain; }
+.nf-gal__icon { font: 600 13px var(--mono); color: var(--ink-3); }
+.nf-gal__cap { display: flex; justify-content: space-between; gap: 6px; padding: 0 10px; font-size: 12px; }
+.nf-gal__cap b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nf-gal__prompt {
+  padding: 0 10px; font-size: 12px; color: var(--ink-2); line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.nf-gal__note { padding: 0 10px; font-size: 12px; color: var(--warn); margin: 0; }
+.nf-gal__pick { position: absolute; top: 8px; left: 8px; background: var(--node); border-radius: 4px; padding: 2px 4px; display: flex; }
+.nf-gal__star {
+  position: absolute; top: 6px; right: 6px; font-size: 16px; line-height: 1; padding: 4px 6px;
+  border: 0; border-radius: 6px; background: color-mix(in srgb, var(--node) 85%, transparent); color: var(--ink-3); cursor: pointer;
+}
+.nf-gal__star[data-on] { color: var(--t-file); }
+.nf-gal__more { display: grid; place-items: center; }
+.nf-gal__big {
+  display: grid; place-items: center; min-height: 220px; max-height: 46vh; overflow: hidden; border-bottom: 1px solid var(--line);
+  background: repeating-conic-gradient(var(--panel-2) 0 25%, var(--node) 0 50%) 0 0 / 16px 16px;
+}
+.nf-gal__big img, .nf-gal__big video { max-width: 100%; max-height: 46vh; object-fit: contain; display: block; }
+.nf-gal__big audio { width: 90%; }
+.nf-gal__actions { margin: 0 0 12px; }
+.nf-gal__actions a.nf-btn { text-decoration: none; display: inline-flex; align-items: center; }
+.nf-btn[data-on] { color: var(--t-file); border-color: var(--t-file); }
+.nf-gal__meta { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 14px 0 0; font-size: 12.5px; }
+.nf-gal__meta dt { color: var(--ink-3); }
+.nf-gal__meta dd { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.nf-gal__path { word-break: break-all; font-size: 11px; }
+.nf-gal__params { margin: 0; display: grid; gap: 6px; }
+.nf-gal__params > div { border-left: 3px solid transparent; padding-left: 8px; }
+.nf-gal__params > div[data-diff] { border-left-color: var(--t-file); background: color-mix(in srgb, var(--t-file) 9%, transparent); }
+.nf-gal__params dt { font: 12px var(--mono); color: var(--ink-3); }
+.nf-gal__params dd { margin: 2px 0 0; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+
+.nf-cmp { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
+.nf-cmp__head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.nf-cmp__head h2 { margin: 0; font: 600 17px var(--cond); }
+.nf-cmp__cols { flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--line); }
+.nf-cmp__col { background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.nf-cmp__media {
+  flex: 0 0 auto; height: 56vh; display: grid; place-items: center;
+  background: repeating-conic-gradient(var(--panel-2) 0 25%, var(--node) 0 50%) 0 0 / 16px 16px;
+}
+.nf-cmp__media img, .nf-cmp__media video { max-width: 100%; max-height: 56vh; object-fit: contain; }
+.nf-cmp__info { padding: 12px 14px; overflow: auto; display: grid; gap: 10px; align-content: start; }
+.nf-cmp__info .nf-row { margin: 0; align-items: center; }
+@media (max-width: 900px) {
+  .nf-app[data-view="gallery"] { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: "top" "gal" "insp"; }
+  .nf-cmp__cols { grid-template-columns: 1fr !important; overflow: auto; }
+}

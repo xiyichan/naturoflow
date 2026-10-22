@@ -2,6 +2,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useState } from "react";
 import { subscribe } from "./api.ts";
 import { Canvas } from "./Canvas.tsx";
+import { Gallery } from "./Gallery.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { NodeTypeEditor } from "./NodeTypeEditor.tsx";
 import { Palette } from "./Palette.tsx";
@@ -13,6 +14,7 @@ export function App() {
   const auth = useStore((s) => s.auth);
   const workflowId = useStore((s) => s.workflow?.id);
   const notice = useStore((s) => s.notice);
+  const view = useStore((s) => s.view);
 
   useEffect(() => {
     useStore.getState().init();
@@ -40,14 +42,20 @@ export function App() {
 
   return (
     <ReactFlowProvider>
-      <div className="nf-app">
+      <div className="nf-app" data-view={view}>
         <TopBar />
-        <Palette />
-        <main className="nf-canvas">
-          <Canvas key={workflowId ?? "none"} />
-        </main>
-        <Inspector />
-        <RunDrawer />
+        {view === "gallery" ? (
+          <Gallery />
+        ) : (
+          <>
+            <Palette />
+            <main className="nf-canvas">
+              <Canvas key={workflowId ?? "none"} />
+            </main>
+            <Inspector />
+            <RunDrawer />
+          </>
+        )}
       </div>
       <NodeTypeEditor />
       {notice && (

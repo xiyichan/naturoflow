@@ -128,6 +128,26 @@ export interface NodeRun {
   trace?: { request?: Record<string, unknown>; response?: Record<string, unknown> };
 }
 
+export interface Artifact {
+  path: string;
+  size: number;
+  mime: string;
+  runId: string;
+  runStartedAt: number;
+  runStatus: RunStatus;
+  single?: { nodeId: string; fromRunId?: string };
+  rerunOf?: { runId: string; fromNode: string };
+  nodeId: string;
+  nodeType?: string;
+  nodeLabel?: string;
+  port: string;
+  createdAt: number;
+  params?: Record<string, unknown>;
+  lineage?: { nodeId: string; nodeType?: string; nodeLabel?: string; params?: Record<string, unknown> }[];
+  starred: boolean;
+  note: string;
+}
+
 export interface NodeHistoryEntry {
   runId: string;
   runStartedAt: number;
@@ -238,6 +258,16 @@ export const api = {
       "GET",
       `/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/history?limit=${limit}${before ? `&before=${before}` : ""}`,
     ),
+  artifacts: (workflowId: string, q: { before?: number; nodeId?: string; starred?: boolean; mime?: string; limit?: number } = {}) => {
+    const qs = new URLSearchParams({ limit: String(q.limit ?? 60) });
+    if (q.before) qs.set("before", String(q.before));
+    if (q.nodeId) qs.set("nodeId", q.nodeId);
+    if (q.starred) qs.set("starred", "1");
+    if (q.mime) qs.set("mime", q.mime);
+    return req<{ items: Artifact[]; nextBefore?: number }>("GET", `/workflows/${encodeURIComponent(workflowId)}/artifacts?${qs}`);
+  },
+  markArtifact: (path: string, mark: { starred?: boolean; note?: string }) =>
+    req<{ starred: boolean; note: string }>("PUT", "/artifacts/mark", { path, ...mark }),
   workflowInterface: (id: string) => req<WorkflowInterface>("GET", `/workflows/${encodeURIComponent(id)}/interface`),
   credentials: (type: string) => req<CredentialInfo[]>("GET", `/credentials?type=${encodeURIComponent(type)}`),
   createCredential: (type: string, name: string, data: Record<string, string>) =>

@@ -167,6 +167,22 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
       }),
     ),
   );
+  api.get("/workflows/:id/artifacts", (c) =>
+    c.json(
+      svc.listArtifacts(c.req.param("id"), {
+        limit: Number(c.req.query("limit") ?? 60),
+        before: c.req.query("before") ? Number(c.req.query("before")) : undefined,
+        nodeId: c.req.query("nodeId") || undefined,
+        starred: c.req.query("starred") === "1",
+        mime: c.req.query("mime") || undefined,
+      }),
+    ),
+  );
+  api.put("/artifacts/mark", async (c) => {
+    const { path: p, starred, note } = ((await body(c)) ?? {}) as { path?: string; starred?: boolean; note?: string };
+    if (!p) throw new NfError("INVALID_ARGUMENT", "path is required");
+    return c.json(svc.markArtifact(p, { starred, note }));
+  });
   api.get("/workflows/:id/interface", (c) => c.json(svc.getWorkflowInterface(c.req.param("id"))));
   api.post("/runs/:id/rerun", async (c) => {
     const { nodeId } = ((await body(c)) ?? {}) as { nodeId?: string };
