@@ -86,6 +86,7 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
   const files = filesIn(cur.outputs);
   const images = mediaIn(cur.outputs).filter((m) => !broken.has(m.path));
   const isPinned = pinnedRunId === cur.runId;
+  const pinnedIdx = pinnedRunId ? previews.findIndex((p) => p.runId === pinnedRunId) : -1;
 
   const enlarge = (m: Media) => {
     // All results' media in order, so ← → in the viewer walks through this node's history.
@@ -128,6 +129,16 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
       {previews.length > 1 && (
         <HistoryStrip previews={previews} current={i} pinnedRunId={pinnedRunId} broken={broken} onPick={setI} />
       )}
+      {pinnedRunId && !isPinned && (
+        <p className="nf-res__note">
+          正在看的不是选用的结果，下游用的仍是 ★ 那次
+          {pinnedIdx >= 0 && (
+            <button onClick={() => setI(pinnedIdx)} title="回到选用的那次">
+              查看
+            </button>
+          )}
+        </p>
+      )}
       <div className="nf-res__bar">
         <button disabled={i >= previews.length - 1} onClick={() => setI(i + 1)} aria-label="更早的结果" title="更早的结果">
           ‹
@@ -146,7 +157,7 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
           </button>
         ) : (
           <button className="nf-res__pin" onClick={() => pinResult(nodeId, cur.runId)} title="选用这次的结果：运行时不再执行这个节点，下游用这个结果">
-            选用
+            {pinnedRunId ? "改用这次" : "选用"}
           </button>
         )}
       </div>
@@ -169,6 +180,8 @@ function HistoryStrip({
   onPick: (i: number) => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
+  // Thumbnails whose link no longer loads (expired / private) show as numbered chips instead.
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   // Keep the shown result in view as it changes.
   useEffect(() => {
     strip.current?.querySelector<HTMLElement>("[data-current]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -177,7 +190,7 @@ function HistoryStrip({
   return (
     <div ref={strip} className="nf-res__strip nowheel" role="listbox" aria-label="历史结果">
       {previews.map((p, idx) => {
-        const m = mediaIn(p.outputs).find((x) => !broken.has(x.path));
+        const m = mediaIn(p.outputs).find((x) => !broken.has(x.path) && !failed.has(x.path));
         return (
           <button
             key={p.runId}
@@ -189,7 +202,13 @@ function HistoryStrip({
             onClick={() => onPick(idx)}
           >
             {m && !m.mime.startsWith("video/") ? (
-              <img src={mediaSrc(m)} alt="" draggable={false} loading="lazy" referrerPolicy="no-referrer" />
+              <img
+                src={mediaSrc(m)}
+                alt=""
+                draggable={false}
+                referrerPolicy="no-referrer"
+                onError={() => setFailed((f) => new Set(f).add(m.path))}
+              />
             ) : m ? (
               <video src={mediaSrc(m)} muted preload="metadata" />
             ) : (

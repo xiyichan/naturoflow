@@ -412,7 +412,15 @@ export const useStore = create<State>((set, get) => ({
           if (e.run.workflowId === wfId) {
             set({ singleRuns: { ...s.singleRuns, [e.run.single.nodeId]: e.run } });
             const n = e.run.nodes[e.run.single.nodeId];
-            s.notify(n?.status === "success" ? "info" : "error", n?.status === "success" ? `${e.run.single.nodeId} 单独运行完成` : `${e.run.single.nodeId} 单独运行失败${n?.error ? `：${n.error}` : ""}`);
+            const pinned = s.workflow?.nodes.find((x) => x.id === e.run.single!.nodeId)?.pin;
+            s.notify(
+              n?.status === "success" ? "info" : "error",
+              n?.status !== "success"
+                ? `${e.run.single.nodeId} 单独运行失败${n?.error ? `：${n.error}` : ""}`
+                : pinned
+                  ? `${e.run.single.nodeId} 生成了新结果，但它仍选用着之前的结果，下游不会用新的。要用新的，在卡片上点「改用这次」`
+                  : `${e.run.single.nodeId} 单独运行完成`,
+            );
           }
           break;
         }

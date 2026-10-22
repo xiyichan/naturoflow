@@ -668,3 +668,9 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 }
 .nf-res__strip img, .nf-res__strip video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .nf-res__strip span { font: 600 11px var(--mono); color: var(--ink-3); }
+
+.nf-res__note {
+  margin: 6px 0 0; padding: 4px 6px; border-radius: 4px; font-size: 11.5px; line-height: 1.35;
+  color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); display: flex; gap: 6px; align-items: baseline;
+}
+.nf-res__note button { margin-left: auto; font: 500 11.5px var(--sans); color: var(--run); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; white-space: nowrap; }
