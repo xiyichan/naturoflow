@@ -1,0 +1,43 @@
+id: image.svg-to-png
+name: SVG 转 PNG
+category: media
+description: >-
+  把 SVG 渲染成带透明通道的 PNG（背景透明），按指定宽度等比缩放，矢量图放大也清晰。
+  macOS 用系统自带的 sips，其他系统需要安装 rsvg-convert（librsvg）。
+inputs:
+  file:
+    type: file
+    description: SVG 文件
+params:
+  type: object
+  properties:
+    width:
+      type: integer
+      default: 2048
+      minimum: 16
+      maximum: 8192
+      description: 输出宽度（像素），高度按 SVG 比例计算
+outputs:
+  file:
+    type: file
+    description: 透明背景的 PNG
+  width: { type: number }
+  height: { type: number }
+executor:
+  kind: script
+  language: js
+  file: image.svg-to-png.mjs
+cache: true
+timeout: 2m
+i18n:
+  en:
+    name: SVG to PNG
+    description: >-
+      Render an SVG as a PNG with an alpha channel (transparent background), scaled to the given width so vectors stay sharp.
+      Uses the built-in sips on macOS; elsewhere it needs rsvg-convert (librsvg).
+    inputs:
+      file: The SVG file
+    params:
+      width: Output width in pixels; the height follows the SVG's proportions
+    outputs:
+      file: PNG with a transparent background
