@@ -511,6 +511,68 @@ export class NaturoflowService extends EventEmitter {
     return this.start(wf, prev.inputs, { reuse, rerunOf: { runId, fromNode: nodeId } }, opts.wait);
   }
 
+  /**
+   * Run one node on its own (no upstream/downstream). Inputs come from `inputs` if given, else from
+   * the `fromRunId` run's record of this node, else from the node's most recent execution.
+   * `params: "history"` replays that record's params; the default uses the node's current params.
+   */
+  async runSingleNode(
+    workflowId: string,
+    nodeId: string,
+    opts: {
+      fromRunId?: string;
+      inputs?: Record<string, unknown>;
+      params?: "current" | "history";
+      useCache?: boolean;
+      wait?: boolean;
+    } = {},
+  ): Promise<RunRecord> {
+    const wf = this.getWorkflow(workflowId);
+    const node = wf.nodes.find((n) => n.id === nodeId);
+    if (!node) throw new NfError("NODE_NOT_FOUND", `node "${nodeId}" not in workflow`);
+    const def = this.registry.require(node.type).def;
+
+    // The source record: an explicit earlier run, else the latest time this node ran.
+    let sourceRun: RunRecord | undefined;
+    if (opts.fromRunId) {
+      sourceRun = this.getRun(opts.fromRunId);
+      if (sourceRun.workflowId !== workflowId || !sourceRun.nodes[nodeId]) {
+        throw new NfError("NODE_NOT_FOUND", `run "${opts.fromRunId}" has no record of node "${nodeId}"`);
+      }
+    } else if (!opts.inputs || opts.params === "history") {
+      const latest = this.store.nodeHistory(workflowId, nodeId, 1)[0];
+      if (latest) sourceRun = this.getRun(latest.runId);
+    }
+    const source = sourceRun?.nodes[nodeId];
+
+    const inputs = opts.inputs ?? source?.inputs ?? {};
+    const missing = Object.entries(def.inputs).filter(([k, p]) => p.required && inputs[k] === undefined).map(([k]) => k);
+    if (missing.length) {
+      throw new NfError(
+        "MISSING_INPUT",
+        `no value for input ${missing.map((m) => `"${m}"`).join(", ")}: run the workflow once, pick a history entry, or provide inputs`,
+      );
+    }
+    if (opts.params === "history" && !source?.params) {
+      throw new NfError("NO_HISTORY_PARAMS", "that execution has no recorded params (it ran before params were recorded)");
+    }
+
+    return this.start(
+      wf,
+      sourceRun?.inputs ?? {},
+      {
+        single: {
+          nodeId,
+          inputs,
+          ...(opts.params === "history" ? { params: source!.params } : {}),
+          ...(sourceRun ? { fromRunId: sourceRun.id } : {}),
+        },
+        useCache: opts.useCache ?? false,
+      },
+      opts.wait,
+    );
+  }
+
   private start(wf: Workflow, inputs: Record<string, unknown>, ro: RunOptions, wait = true): Promise<RunRecord> {
     if (wait) return this.engine.run(wf, inputs, ro);
     return new Promise<RunRecord>((resolve, reject) => {

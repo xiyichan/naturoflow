@@ -213,6 +213,8 @@ export interface RunRecord {
   parentRunId?: string;
   /** Set when this run re-ran part of an earlier run. */
   rerunOf?: { runId: string; fromNode: string };
+  /** Set when only one node was run on its own. */
+  single?: { nodeId: string; fromRunId?: string };
 }
 
 export class NfError extends Error {

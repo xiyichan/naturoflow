@@ -457,3 +457,14 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 .nf-hist__url b { font-family: var(--mono); color: var(--run); font-size: 11.5px; }
 .nf-hist__logs { margin-top: 10px; }
 .nf-hist__logs summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); }
+
+/* ---------- single-node runs ---------- */
+.nf-insp__actions { margin-top: 10px; display: flex; gap: 6px; }
+.nf-single { display: grid; gap: 8px; padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.nf-single h4 { margin: 0; }
+.nf-single > .nf-muted { margin: 0; font-size: 12.5px; }
+.nf-single__modes { display: flex; gap: 14px; font-size: 13px; }
+.nf-single__modes label, .nf-single__cache { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.nf-single .nf-btn--primary { justify-self: start; }
+.nf-single__result { margin-top: 6px; padding: 10px; background: var(--node); border: 1px solid var(--line); border-radius: 8px; }
+.nf-single__result > .nf-muted { margin: 0 0 6px; font-size: 12px; }

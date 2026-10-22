@@ -184,6 +184,11 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Subflow nesting depth, to stop runaway recursion. */
   depth?: number;
+  /**
+   * Run just this node with the given inputs (no upstream/downstream). `params`, when given,
+   * replaces the node's saved params for this run.
+   */
+  single?: { nodeId: string; inputs: Record<string, unknown>; params?: Record<string, unknown>; fromRunId?: string };
 }
 
 const MAX_DEPTH = 8;
@@ -207,7 +212,13 @@ export class Engine extends EventEmitter {
 
   /** Runs a workflow; resolves when it finishes. */
   async run(wf: Workflow, inputs: Record<string, unknown> = {}, ro: RunOptions = {}): Promise<RunRecord> {
-    const issues = validateWorkflow(wf, this.registry);
+    if (ro.single) {
+      const node = wf.nodes.find((n) => n.id === ro.single!.nodeId);
+      if (!node) throw new Error(`node "${ro.single.nodeId}" not in workflow`);
+      wf = { ...wf, nodes: [{ ...node, params: ro.single.params ?? node.params }], edges: [] };
+    }
+    // A single-node run gets its inputs directly, so unconnected inputs are expected.
+    const issues = validateWorkflow(wf, this.registry).filter((i) => !(ro.single && i.code === "UNCONNECTED_INPUT"));
     if (issues.length) {
       const err = new Error(`workflow is invalid:\n${issues.map((i) => `- ${i.nodeId ?? i.path ?? ""} ${i.message}`).join("\n")}`);
       (err as Error & { issues: ValidationIssue[] }).issues = issues;
@@ -224,6 +235,7 @@ export class Engine extends EventEmitter {
       nodes: {},
       ...(ro.parentRunId ? { parentRunId: ro.parentRunId } : {}),
       ...(ro.rerunOf ? { rerunOf: ro.rerunOf } : {}),
+      ...(ro.single ? { single: { nodeId: ro.single.nodeId, ...(ro.single.fromRunId ? { fromRunId: ro.single.fromRunId } : {}) } } : {}),
     };
     for (const n of wf.nodes) run.nodes[n.id] = { runId: run.id, nodeId: n.id, status: "pending", logs: [], attempts: 0 };
     const ac = new AbortController();
@@ -311,7 +323,7 @@ export class Engine extends EventEmitter {
     this.emit("event", { type: "node.started", runId: run.id, nodeId: node.id } satisfies EngineEvent);
 
     // Inputs from ports that did not fire are left undefined (only optional ports get here).
-    const inputs = Object.fromEntries(
+    const inputs = ro.single?.nodeId === node.id ? ro.single.inputs : Object.fromEntries(
       incoming
         .filter((e) => !run.nodes[e.from.node].inactive?.includes(e.from.port))
         .map((e) => [e.to.port, run.nodes[e.from.node].outputs?.[e.from.port]]),
@@ -346,7 +358,7 @@ export class Engine extends EventEmitter {
     };
     // Stored for the node's history: masked, with long strings clipped.
     const keep = <T>(v: T): T => JSON.parse(mask(JSON.stringify(clip(v)))) as T;
-    nr.params = keep(params);
+    nr.params = JSON.parse(mask(JSON.stringify(params)));
     const trace = (t: NodeTrace) => {
       nr.trace = { ...nr.trace, ...keep(t) };
     };

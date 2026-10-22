@@ -136,7 +136,8 @@ export class Store {
     const path = `$.nodes."${nodeId.replace(/"/g, "")}"`;
     const rows = this.db
       .prepare(
-        `SELECT id, started_at, status, json_extract(json, '$.rerunOf') AS rerun_of, json_extract(json, ?) AS node
+        `SELECT id, started_at, status, json_extract(json, '$.rerunOf') AS rerun_of,
+                json_extract(json, '$.single') AS single, json_extract(json, ?) AS node
          FROM runs
          WHERE workflow_id = ? AND started_at < ?
            AND json_extract(json, ? || '.status') NOT IN ('pending', 'skipped')
@@ -148,6 +149,7 @@ export class Store {
       runStartedAt: Number(r.started_at),
       runStatus: String(r.status) as RunRecord["status"],
       ...(r.rerun_of ? { rerunOf: JSON.parse(String(r.rerun_of)) } : {}),
+      ...(r.single ? { single: JSON.parse(String(r.single)) } : {}),
       node: JSON.parse(String(r.node)),
     }));
   }
@@ -190,5 +192,6 @@ export interface NodeHistoryEntry {
   runStartedAt: number;
   runStatus: RunRecord["status"];
   rerunOf?: RunRecord["rerunOf"];
+  single?: RunRecord["single"];
   node: NodeRunRecord;
 }

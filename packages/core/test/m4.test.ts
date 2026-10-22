@@ -209,6 +209,53 @@ describe("cache and rerun", () => {
   });
 });
 
+describe("single-node runs", () => {
+  it("run one node with its last inputs, explicit inputs, or a history entry's params", async () => {
+    const a = path.join(home, "sa.txt");
+    const b = path.join(home, "sb.txt");
+    svc.saveWorkflow({
+      id: "single",
+      name: "single",
+      nodes: [
+        { id: "a", type: "test.counter", params: { file: a }, cache: false },
+        { id: "b", type: "test.counter", params: { file: b, tag: "v1" }, cache: false },
+      ],
+      edges: [edge("a", "n", "b", "in")],
+    });
+    const full = await svc.runWorkflow("single");
+    expect(full.nodes.b.inputs).toEqual({ in: 1 });
+
+    // Only b runs, with the inputs it got last time.
+    const s1 = await svc.runSingleNode("single", "b");
+    expect(s1.status).toBe("success");
+    expect(Object.keys(s1.nodes)).toEqual(["b"]);
+    expect(s1.single).toEqual({ nodeId: "b", fromRunId: full.id });
+    expect(s1.nodes.b.inputs).toEqual({ in: 1 });
+    expect([lines(a), lines(b)]).toEqual([1, 2]);
+
+    // Explicit inputs, and the node's current params by default.
+    svc.applyPatch("single", [{ op: "update_node", id: "b", params: { tag: "v2" } }]);
+    const s2 = await svc.runSingleNode("single", "b", { inputs: { in: 99 } });
+    expect(s2.nodes.b.inputs).toEqual({ in: 99 });
+    expect(s2.nodes.b.params).toMatchObject({ tag: "v2" });
+
+    // Replay a history entry exactly: its inputs and its params.
+    const s3 = await svc.runSingleNode("single", "b", { fromRunId: full.id, params: "history" });
+    expect(s3.nodes.b.params).toMatchObject({ tag: "v1" });
+    expect(s3.nodes.b.inputs).toEqual({ in: 1 });
+
+    const h = svc.nodeHistory("single", "b");
+    expect(h.map((e) => !!e.single)).toEqual([true, true, true, false]);
+    // A cacheable node still executes when run on its own (cache off by default).
+    expect(lines(b)).toBe(4);
+  });
+
+  it("refuses when a required input has never had a value", async () => {
+    svc.saveWorkflow({ id: "fresh", name: "fresh", nodes: [{ id: "gif", type: "ffmpeg.to-gif" }] });
+    await expect(svc.runSingleNode("fresh", "gif")).rejects.toThrow(/no value for input "video"/);
+  });
+});
+
 describe("templated params", () => {
   it("lets params read workflow inputs and node inputs", async () => {
     const run = await svc.runWorkflow(

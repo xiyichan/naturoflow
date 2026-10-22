@@ -41,6 +41,8 @@ function NodePanel({ node }: { node: WorkflowNode }) {
   const setEditor = useStore((s) => s.setEditor);
   const [def, setDef] = useState<NodeTypeDef | null>(null);
   const [tab, setTab] = useState<"params" | "run" | "history">("params");
+  const runNode = useStore((s) => s.runNode);
+  const singleRun = useStore((s) => s.singleRuns[node.id]);
   const nodeRun = run?.nodes[node.id];
 
   useEffect(() => {
@@ -63,6 +65,12 @@ function NodePanel({ node }: { node: WorkflowNode }) {
     }, 450);
   };
   useEffect(() => () => clearTimeout(timer.current), []);
+  /** Save a pending param edit immediately (so a run uses what's on screen). */
+  const flushNow = async () => {
+    clearTimeout(timer.current);
+    await patch([{ op: "update_node", id: node.id, params: draft, replaceParams: true }]);
+    dirty.current = false;
+  };
 
   const [label, setLabel] = useState(node.label ?? "");
   useEffect(() => setLabel(node.label ?? ""), [node.label]);
@@ -88,6 +96,19 @@ function NodePanel({ node }: { node: WorkflowNode }) {
           )}
         </p>
         {nodeTypeSummary?.description && <p className="nf-insp__desc">{nodeTypeSummary.description}</p>}
+        <div className="nf-insp__actions">
+          <button
+            className="nf-btn"
+            disabled={singleRun?.status === "running"}
+            title="只执行这个节点，输入沿用它上一次收到的值；不会运行上下游"
+            onClick={async () => {
+              if (dirty.current) await flushNow();
+              if (await runNode(node.id)) setTab("run");
+            }}
+          >
+            {singleRun?.status === "running" ? "单独运行中…" : "单独运行"}
+          </button>
+        </div>
       </header>
 
       <div className="nf-tabs" role="tablist">
@@ -128,9 +149,13 @@ function NodePanel({ node }: { node: WorkflowNode }) {
             <p className="nf-muted">加载中…</p>
           )
         ) : tab === "run" ? (
-          <RunDetail run={nodeRun} nodeId={node.id} />
+          <>
+            <SingleRunBox node={node} def={def} beforeRun={async () => dirty.current && (await flushNow())} />
+            <h4>工作流运行结果</h4>
+            <RunDetail run={nodeRun} nodeId={node.id} />
+          </>
         ) : (
-          <NodeHistory nodeId={node.id} />
+          <NodeHistory nodeId={node.id} onRan={() => setTab("run")} />
         )}
       </div>
     </>
@@ -165,10 +190,10 @@ function Ports({ def }: { def: NodeTypeDef }) {
   );
 }
 
-function RunDetail({ run, nodeId }: { run?: NodeRun; nodeId: string }) {
+function RunDetail({ run, nodeId, single }: { run?: NodeRun; nodeId: string; single?: boolean }) {
   const rerunFrom = useStore((s) => s.rerunFrom);
   const runStatus = useStore((s) => s.run?.status);
-  const rerun = runStatus && runStatus !== "running" && (
+  const rerun = !single && runStatus && runStatus !== "running" && (
     <button className="nf-btn" onClick={() => rerunFrom(nodeId)} title="上游节点沿用这次运行的结果，只重新执行这个节点和它的下游">
       从这里重新运行
     </button>
@@ -305,6 +330,7 @@ function WorkflowPanel() {
                   <span className="nf-dot" data-status={r.status} />
                   {new Date(r.startedAt).toLocaleString()}
                   {r.rerunOf && <span className="nf-tag">从 {r.rerunOf.fromNode} 重跑</span>}
+                  {r.single && <span className="nf-tag">单独运行 {r.single.nodeId}</span>}
                   <span className="nf-muted">{STATUS_TEXT[r.status]}</span>
                 </button>
               </li>
@@ -414,7 +440,9 @@ function PublishSection() {
 }
 
 /** Every past execution of this node, newest first, with what was sent and received. */
-function NodeHistory({ nodeId }: { nodeId: string }) {
+function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
+  const runNode = useStore((s) => s.runNode);
+  const singleRunning = useStore((s) => s.singleRuns[nodeId]?.status === "running");
   const workflowId = useStore((s) => s.workflow!.id);
   // Refetch when a run of this workflow finishes.
   const lastFinished = useStore((s) => (s.run?.workflowId === workflowId ? s.run.finishedAt : undefined));
@@ -457,6 +485,7 @@ function NodeHistory({ nodeId }: { nodeId: string }) {
               <span className="nf-hist__time">{new Date(n.startedAt ?? h.runStartedAt).toLocaleString()}</span>
               {n.cached && <span className="nf-tag">{n.cached === "cache" ? "缓存" : "沿用"}</span>}
               {h.rerunOf && <span className="nf-tag">重跑</span>}
+              {h.single && <span className="nf-tag">单独运行</span>}
               <span className="nf-muted nf-hist__meta">
                 {STATUS_TEXT[n.status]}
                 {ms !== undefined && !n.cached ? `，${ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}` : ""}
@@ -476,6 +505,24 @@ function NodeHistory({ nodeId }: { nodeId: string }) {
                     <pre className="nf-log">{n.logs.join("\n")}</pre>
                   </details>
                 )}
+                <div className="nf-row">
+                  <button
+                    className="nf-btn"
+                    disabled={singleRunning}
+                    title="用这次的输入单独运行这个节点，参数用节点现在的设置"
+                    onClick={async () => (await runNode(nodeId, { fromRunId: h.runId, params: "current" })) && onRan()}
+                  >
+                    用这次的输入运行
+                  </button>
+                  <button
+                    className="nf-btn"
+                    disabled={singleRunning || !n.params}
+                    title={n.params ? "输入和参数都和这次完全一样，重新执行一遍" : "这次执行没有记录参数（发生在记录参数功能上线之前）"}
+                    onClick={async () => (await runNode(nodeId, { fromRunId: h.runId, params: "history" })) && onRan()}
+                  >
+                    按这次完整重放
+                  </button>
+                </div>
                 <div className="nf-row">
                   {h.runId !== currentRun ? (
                     <button className="nf-btn nf-btn--ghost" onClick={() => showRun(h.runId)}>
@@ -516,5 +563,85 @@ function TraceBlock({ title, value }: { title: string; value: Record<string, unk
       )}
       <pre className="nf-log">{JSON.stringify(method && url ? rest : value, null, 2)}</pre>
     </>
+  );
+}
+
+/** Run just this node: with its last inputs, or inputs typed here. */
+function SingleRunBox({ node, def, beforeRun }: { node: WorkflowNode; def: NodeTypeDef | null; beforeRun: () => Promise<unknown> }) {
+  const workflowId = useStore((s) => s.workflow!.id);
+  const runNode = useStore((s) => s.runNode);
+  const single = useStore((s) => s.singleRuns[node.id]);
+  const [mode, setMode] = useState<"last" | "custom">("last");
+  const [text, setText] = useState("");
+  const [useCache, setUseCache] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hasInputs = !!def && Object.keys(def.inputs).length > 0;
+
+  // Prefill the custom inputs with what the node got last time (or empty ports).
+  useEffect(() => {
+    if (mode !== "custom" || text) return;
+    api.nodeHistory(workflowId, node.id, undefined, 1).then((h) => {
+      const last = h[0]?.node.inputs;
+      const blank = Object.fromEntries(Object.keys(def?.inputs ?? {}).map((k) => [k, null]));
+      setText(JSON.stringify(last && Object.keys(last).length ? last : blank, null, 2));
+    });
+  }, [mode, workflowId, node.id, def, text]);
+
+  const run = async () => {
+    setError(null);
+    let inputs: Record<string, unknown> | undefined;
+    if (mode === "custom") {
+      try {
+        inputs = JSON.parse(text || "{}");
+      } catch {
+        return setError("输入不是合法的 JSON");
+      }
+    }
+    await beforeRun();
+    await runNode(node.id, { ...(inputs ? { inputs } : {}), useCache });
+  };
+
+  const nr = single?.nodes[node.id];
+  return (
+    <section className="nf-single">
+      <h4>单独运行</h4>
+      <p className="nf-muted">只执行这个节点，上下游都不会运行。结果会记进这个节点的历史。</p>
+      {hasInputs && (
+        <div className="nf-single__modes" role="radiogroup" aria-label="输入来源">
+          <label>
+            <input type="radio" checked={mode === "last"} onChange={() => setMode("last")} /> 沿用上次的输入
+          </label>
+          <label>
+            <input type="radio" checked={mode === "custom"} onChange={() => setMode("custom")} /> 手动填写输入
+          </label>
+        </div>
+      )}
+      {hasInputs && mode === "custom" && (
+        <textarea
+          className="nf-input nf-code"
+          rows={Math.min(12, Math.max(4, text.split("\n").length))}
+          spellCheck={false}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          aria-label="输入（JSON，按端口名）"
+        />
+      )}
+      <label className="nf-single__cache">
+        <input type="checkbox" checked={useCache} onChange={(e) => setUseCache(e.target.checked)} /> 输入和参数没变时使用缓存
+      </label>
+      {error && <p className="nf-field__error">{error}</p>}
+      <button className="nf-btn nf-btn--primary" disabled={single?.status === "running"} onClick={run}>
+        {single?.status === "running" ? "运行中…" : "运行这个节点"}
+      </button>
+      {nr && (
+        <div className="nf-single__result">
+          <p className="nf-muted">
+            {new Date(single.startedAt).toLocaleString()} 的单独运行
+            {single.single?.fromRunId ? "（输入来自之前的一次运行）" : ""}
+          </p>
+          <RunDetail run={nr} nodeId={node.id} single />
+        </div>
+      )}
+    </section>
   );
 }

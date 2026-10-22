@@ -31,6 +31,12 @@ interface State {
   logOpen: boolean;
   /** Bumped whenever saved credentials change, so pickers refetch. */
   credVersion: number;
+  /** Latest single-node run per node of the open workflow (kept apart from the canvas run). */
+  singleRuns: Record<string, Run>;
+  runNode(
+    nodeId: string,
+    opts?: { fromRunId?: string; inputs?: Record<string, unknown>; params?: "current" | "history"; useCache?: boolean },
+  ): Promise<boolean>;
 
   init(): Promise<void>;
   loadNodeTypes(): Promise<void>;
@@ -86,6 +92,7 @@ export const useStore = create<State>((set, get) => ({
   editor: null,
   logOpen: false,
   credVersion: 0,
+  singleRuns: {},
 
   async init() {
     try {
@@ -116,7 +123,7 @@ export const useStore = create<State>((set, get) => ({
   async openWorkflow(id) {
     const [workflow, issues, runs] = await Promise.all([api.workflow(id), api.validate(id), api.runs(id)]);
     storage.set(LAST_WF, id);
-    set({ workflow, issues, runs, selected: null, run: null });
+    set({ workflow, issues, runs, selected: null, run: null, singleRuns: {} });
     if (runs[0]) await get().showRun(runs[0].id);
   },
 
@@ -164,6 +171,22 @@ export const useStore = create<State>((set, get) => ({
       set({ logOpen: true });
     } catch (e) {
       get().notify("error", message(e));
+    }
+  },
+
+  async runNode(nodeId, opts = {}) {
+    const wf = get().workflow;
+    if (!wf) return false;
+    try {
+      const { id } = await api.runNode(wf.id, nodeId, opts);
+      if (get().singleRuns[nodeId]?.id !== id) {
+        const run = await api.getRun(id);
+        set((s) => ({ singleRuns: { ...s.singleRuns, [nodeId]: run } }));
+      }
+      return true;
+    } catch (e) {
+      get().notify("error", message(e));
+      return false;
     }
   },
 
@@ -243,23 +266,39 @@ export const useStore = create<State>((set, get) => ({
         if (wfId) api.validate(wfId).then((issues) => get().workflow?.id === wfId && set({ issues }));
         break;
       case "run.started":
+        // A single-node run is shown on that node, not as the canvas run.
+        if (e.run.single) {
+          if (e.run.workflowId === wfId) set({ singleRuns: { ...s.singleRuns, [e.run.single.nodeId]: e.run } });
+          break;
+        }
         // Child runs of subflow/map nodes belong to their parent; don't take over the canvas.
         if (e.run.workflowId === wfId && !e.run.parentRunId) set({ run: e.run, runs: [e.run, ...s.runs].slice(0, 10) });
         break;
       case "node.started":
       case "node.log":
       case "node.finished": {
-        const run = s.run;
+        const single = Object.values(s.singleRuns).find((r) => r.id === e.runId);
+        const run = single ?? s.run;
         if (!run || run.id !== e.runId) return;
         const prev: NodeRun = run.nodes[e.type === "node.finished" ? e.node.nodeId : e.nodeId];
         let next: NodeRun;
         if (e.type === "node.started") next = { ...prev, status: "running", startedAt: Date.now() };
         else if (e.type === "node.log") next = { ...prev, logs: [...prev.logs, e.line].slice(-2000) };
         else next = { ...e.node, logs: e.node.logs.length ? e.node.logs : prev.logs };
-        set({ run: { ...run, nodes: { ...run.nodes, [next.nodeId]: next } } });
+        const updated = { ...run, nodes: { ...run.nodes, [next.nodeId]: next } };
+        if (single) set({ singleRuns: { ...s.singleRuns, [single.single!.nodeId]: updated } });
+        else set({ run: updated });
         break;
       }
       case "run.finished":
+        if (e.run.single) {
+          if (e.run.workflowId === wfId) {
+            set({ singleRuns: { ...s.singleRuns, [e.run.single.nodeId]: e.run } });
+            const n = e.run.nodes[e.run.single.nodeId];
+            s.notify(n?.status === "success" ? "info" : "error", n?.status === "success" ? `${e.run.single.nodeId} 单独运行完成` : `${e.run.single.nodeId} 单独运行失败${n?.error ? `：${n.error}` : ""}`);
+          }
+          break;
+        }
         if (e.run.workflowId === wfId && !e.run.parentRunId) {
           set({ run: s.run?.id === e.run.id || !s.run ? e.run : s.run, runs: s.runs.map((r) => (r.id === e.run.id ? e.run : r)) });
           if (s.run?.id === e.run.id) {

@@ -22,6 +22,8 @@ const STATUS: Record<string, number> = {
   WORKFLOW_NOT_FOUND: 404,
   RUN_NOT_FOUND: 404,
   CREDENTIAL_NOT_FOUND: 404,
+  MISSING_INPUT: 422,
+  NO_HISTORY_PARAMS: 422,
   NODE_NOT_FOUND: 404,
   CONFLICT: 409,
   VERSION_CONFLICT: 409,
@@ -147,6 +149,16 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     return c.json({ id: run.id, status: run.status }, 202);
   });
 
+  api.post("/workflows/:id/nodes/:nodeId/run", async (c) => {
+    const opts = ((await body(c)) ?? {}) as {
+      fromRunId?: string;
+      inputs?: Record<string, unknown>;
+      params?: "current" | "history";
+      useCache?: boolean;
+    };
+    const run = await svc.runSingleNode(c.req.param("id"), c.req.param("nodeId"), { ...opts, wait: false });
+    return c.json({ id: run.id, status: run.status }, 202);
+  });
   api.get("/workflows/:id/nodes/:nodeId/history", (c) =>
     c.json(
       svc.nodeHistory(c.req.param("id"), c.req.param("nodeId"), {

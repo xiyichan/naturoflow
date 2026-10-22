@@ -133,6 +133,7 @@ export interface NodeHistoryEntry {
   runStartedAt: number;
   runStatus: RunStatus;
   rerunOf?: { runId: string; fromNode: string };
+  single?: { nodeId: string; fromRunId?: string };
   node: NodeRun;
 }
 
@@ -148,6 +149,7 @@ export interface Run {
   nodes: Record<string, NodeRun>;
   parentRunId?: string;
   rerunOf?: { runId: string; fromNode: string };
+  single?: { nodeId: string; fromRunId?: string };
 }
 
 export type PatchOp =
@@ -226,6 +228,11 @@ export const api = {
     req<{ id: string; status: RunStatus }>("POST", `/workflows/${encodeURIComponent(id)}/run`, { inputs, useCache }),
   rerun: (runId: string, nodeId: string) =>
     req<{ id: string; status: RunStatus }>("POST", `/runs/${encodeURIComponent(runId)}/rerun`, { nodeId }),
+  runNode: (
+    workflowId: string,
+    nodeId: string,
+    opts: { fromRunId?: string; inputs?: Record<string, unknown>; params?: "current" | "history"; useCache?: boolean },
+  ) => req<{ id: string; status: RunStatus }>("POST", `/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/run`, opts),
   nodeHistory: (workflowId: string, nodeId: string, before?: number, limit = 20) =>
     req<NodeHistoryEntry[]>(
       "GET",

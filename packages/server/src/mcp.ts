@@ -399,6 +399,30 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
   );
 
   server.registerTool(
+    "run_node",
+    {
+      title: "Run a single node",
+      description:
+        "Run one node on its own — no upstream or downstream nodes. Inputs: `inputs` if given, else that node's inputs from `fromRunId` (a runId from get_node_history), else from its most recent execution. params \"current\" (default) uses the node's current params, \"history\" replays the params recorded in that execution. Cache is off unless useCache. The result is added to the node's history.",
+      inputSchema: {
+        workflowId,
+        nodeId: z.string(),
+        fromRunId: z.string().optional(),
+        inputs: z.record(z.string(), z.any()).optional().describe("value per input port"),
+        params: z.enum(["current", "history"]).default("current"),
+        useCache: z.boolean().default(false),
+        waitSeconds: z.number().min(0).max(300).default(45),
+      },
+    },
+    wrap(async ({ workflowId, nodeId, fromRunId, inputs, params, useCache, waitSeconds }) => {
+      const started = await svc.runSingleNode(workflowId, nodeId, { fromRunId, inputs, params, useCache, wait: false });
+      const run = await svc.waitForRun(started.id, waitSeconds * 1000);
+      const { logs, ...node } = run.nodes[nodeId];
+      return { runId: run.id, status: run.status, node: { ...node, logs: logs.slice(-30) } };
+    }),
+  );
+
+  server.registerTool(
     "get_node_history",
     {
       title: "Get node history",
