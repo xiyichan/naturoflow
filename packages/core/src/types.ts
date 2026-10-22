@@ -174,6 +174,8 @@ export type RunStatus = "pending" | "running" | "success" | "failed" | "skipped"
 export interface NodeRunRecord {
   runId: string;
   nodeId: string;
+  /** The node's type at run time (kept so history still makes sense if the node is deleted). */
+  nodeType?: string;
   status: RunStatus;
   inputs?: Record<string, unknown>;
   outputs?: Record<string, unknown>;

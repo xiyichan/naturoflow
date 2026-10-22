@@ -237,7 +237,7 @@ export class Engine extends EventEmitter {
       ...(ro.rerunOf ? { rerunOf: ro.rerunOf } : {}),
       ...(ro.single ? { single: { nodeId: ro.single.nodeId, ...(ro.single.fromRunId ? { fromRunId: ro.single.fromRunId } : {}) } } : {}),
     };
-    for (const n of wf.nodes) run.nodes[n.id] = { runId: run.id, nodeId: n.id, status: "pending", logs: [], attempts: 0 };
+    for (const n of wf.nodes) run.nodes[n.id] = { runId: run.id, nodeId: n.id, nodeType: n.type, status: "pending", logs: [], attempts: 0 };
     const ac = new AbortController();
     const onParentAbort = () => ac.abort();
     ro.signal?.addEventListener("abort", onParentAbort, { once: true });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { api, fileUrl, type Artifact, type UploadedFile } from "./api.ts";
+import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
 
 /** Drag payload for a file going onto the canvas. */
@@ -143,9 +144,9 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
           {scope === "uploads" ? "还没有上传过文件。" : starred ? "没有标星的文件。" : "还没有生成过文件。"}
         </p>
       ) : (
-        <ul className="nf-assets__grid">
+        <ul className="nf-assets__grid nf-masonry">
           {items?.map((it) => (
-            <li key={it.key}>
+            <MasonryItem key={it.key} gap={8}>
               <div
                 className="nf-assets__item"
                 draggable
@@ -188,7 +189,7 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
                 </span>
                 <span className="nf-assets__cap">{it.sub || it.caption}</span>
               </div>
-            </li>
+            </MasonryItem>
           ))}
         </ul>
       )}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, fileUrl, type Artifact } from "./api.ts";
+import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
 
 const KINDS: { label: string; mime?: string }[] = [
@@ -135,9 +136,9 @@ export function Gallery() {
             <p>运行后，生成的图片、视频、音频都会出现在这里，最新的在最前面。</p>
           </div>
         ) : (
-          <ul className="nf-gal__grid">
+          <ul className="nf-gal__grid nf-masonry">
             {items?.map((a) => (
-              <li key={a.path} data-selected={a.path === selected || undefined} data-picked={picked.includes(a.path) || undefined}>
+              <MasonryItem key={a.path} gap={14} data-selected={a.path === selected || undefined} data-picked={picked.includes(a.path) || undefined}>
                 <button
                   className="nf-gal__card"
                   onClick={() => setSelected(a.path)}
@@ -166,7 +167,7 @@ export function Gallery() {
                 >
                   ★
                 </button>
-              </li>
+              </MasonryItem>
             ))}
             {nextBefore && (
               <li className="nf-gal__more">

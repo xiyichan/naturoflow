@@ -727,6 +727,13 @@ export class NaturoflowService extends EventEmitter {
         for (const nr of Object.values(run.nodes)) {
           if (nr.status !== "success" || nr.cached || !nr.outputs) continue;
           const node = wf.nodes.find((n) => n.id === nr.nodeId);
+          // core.* nodes (File, Constant, Output…) only pass files along; they aren't results.
+          // Older records don't carry the type; a deleted File node is recognised by its shape.
+          const type =
+            nr.nodeType ??
+            node?.type ??
+            (Object.keys(nr.params ?? {}).join() === "path" && Object.keys(nr.outputs).join() === "file" ? "core.file" : undefined);
+          if (type?.startsWith("core.") && type !== "core.map" && type !== "core.subflow") continue;
           for (const { ref, port } of fileRefsIn(nr.outputs)) {
             if (starred && !starred.has(ref.path)) continue;
             if (opts.mime && !ref.mime.startsWith(opts.mime)) continue;
@@ -741,7 +748,7 @@ export class NaturoflowService extends EventEmitter {
               ...(run.single ? { single: run.single } : {}),
               ...(run.rerunOf ? { rerunOf: run.rerunOf } : {}),
               nodeId: nr.nodeId,
-              nodeType: node?.type,
+              nodeType: type,
               ...(node?.label ? { nodeLabel: node.label } : {}),
               port,
               createdAt: nr.finishedAt ?? run.startedAt,

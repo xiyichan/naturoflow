@@ -391,7 +391,7 @@ describe("assets", () => {
     expect(path.basename(up.path)).toBe("我的 参考图.png");
     expect(svc.listUploads()[0]).toMatchObject({ path: up.path, name: "我的 参考图.png", mime: "image/png" });
 
-    const run = await svc.runWorkflow({
+    svc.saveWorkflow({
       id: "asset",
       name: "asset",
       nodes: [
@@ -400,14 +400,22 @@ describe("assets", () => {
       ],
       edges: [edge("pic", "file", "size", "input")],
     });
+    const run = await svc.runWorkflow("asset");
     expect(run.status).toBe("success");
     expect(run.nodes.size.outputs?.result).toBe(3);
 
     const missing = await svc.runWorkflow({ id: "asset2", name: "asset2", nodes: [{ id: "pic", type: "core.file", params: { path: "/nope.png" } }] });
     expect(missing.nodes.pic.error).toMatch(/file not found/);
 
+    // An input file fed in by a File node isn't a generated result — even after that node is deleted.
+    expect(svc.listArtifacts("asset").items).toEqual([]);
+    expect(run.nodes.pic.nodeType).toBe("core.file");
+    svc.applyPatch("asset", [{ op: "remove_node", id: "pic" }]);
+    expect(svc.listArtifacts("asset").items).toEqual([]);
+
     // Cross-workflow listing includes files from every workflow, newest first, no duplicates.
     const all = svc.listAllArtifacts();
+    expect(all.some((a) => a.path === up.path)).toBe(false);
     expect(new Set(all.map((a) => a.path)).size).toBe(all.length);
     expect(all.length).toBeGreaterThan(0);
   });

@@ -618,3 +618,16 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 }
 .nf-cable__cut:hover { background: var(--bad); color: #fff; border-color: var(--bad); }
 .react-flow__edgeupdater { cursor: grab; }
+
+/* ---------- masonry (生成结果 / 素材): natural aspect ratios, reading order kept ---------- */
+.nf-masonry { display: grid; grid-auto-rows: 4px; row-gap: 0 !important; align-content: start; }
+.nf-masonry > li { align-self: start; }
+.nf-masonry__inner { position: relative; }
+.nf-gal__grid.nf-masonry { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); column-gap: 14px; }
+.nf-gal__grid.nf-masonry .nf-gal__more { grid-column: 1 / -1; grid-row-end: span 12; }
+.nf-assets__grid.nf-masonry { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); column-gap: 8px; }
+/* Media at natural height instead of a square crop. */
+.nf-masonry .nf-gal__media, .nf-masonry .nf-assets__media { aspect-ratio: auto; display: block; min-height: 60px; }
+.nf-masonry .nf-gal__media img, .nf-masonry .nf-gal__media video,
+.nf-masonry .nf-assets__media img, .nf-masonry .nf-assets__media video { width: 100%; height: auto; display: block; object-fit: initial; }
+.nf-masonry .nf-gal__icon { display: grid; place-items: center; aspect-ratio: 4 / 3; }
