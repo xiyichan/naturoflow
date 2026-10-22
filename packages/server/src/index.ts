@@ -33,7 +33,7 @@ export async function startServer(
   opts: { svc?: NaturoflowService; port?: number; token?: string; advertise?: boolean } = {},
 ): Promise<RunningServer> {
   const svc = opts.svc ?? new NaturoflowService();
-  const token = opts.token ?? process.env.NATUROFLOW_TOKEN ?? randomBytes(24).toString("base64url");
+  const token = opts.token ?? process.env.NATUROFLOW_TOKEN ?? persistentToken(svc.config.home);
   const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   const app = createApp(svc, { token, webDir });
   const server: ServerType = await new Promise((resolve, reject) => {
@@ -57,6 +57,18 @@ export async function startServer(
       await new Promise<void>((r) => server.close(() => r()));
     },
   };
+}
+
+/** One token per data directory, kept across restarts so the browser stays logged in. */
+function persistentToken(home: string): string {
+  const file = path.join(home, "token");
+  try {
+    const t = fs.readFileSync(file, "utf8").trim();
+    if (t.length >= 16) return t;
+  } catch {}
+  const t = randomBytes(24).toString("base64url");
+  fs.writeFileSync(file, t, { mode: 0o600 });
+  return t;
 }
 
 function readInfoFile(home: string): ServerInfo | undefined {
