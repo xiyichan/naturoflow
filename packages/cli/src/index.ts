@@ -11,7 +11,8 @@ Usage:
   naturoflow mcp                             MCP over stdio (proxies to a running server, else embeds one)
   naturoflow run <workflow.json | workflow-id> [-i key=value ...] [--json]
   naturoflow validate <workflow.json | workflow-id>
-  naturoflow import <workflow.json>          save a workflow file into the local store
+  naturoflow export <workflow-id> [file]     write a workflow as a portable JSON file (stdout if no file)
+  naturoflow import <workflow.json>          create a workflow from an exported file (or save a raw workflow)
   naturoflow workflows                       list stored workflows
   naturoflow nodes                           list node types
   naturoflow node <type-id>                  show a node type definition
@@ -100,9 +101,24 @@ async function main() {
         process.exitCode = issues.length ? 1 : 0;
         break;
       }
+      case "export": {
+        const text = JSON.stringify(svc.exportWorkflow(arg), null, 2) + "\n";
+        if (positionals[2]) {
+          fs.writeFileSync(positionals[2], text);
+          console.log(`wrote ${positionals[2]}`);
+        } else process.stdout.write(text);
+        break;
+      }
       case "import": {
-        const wf = svc.saveWorkflow(JSON.parse(fs.readFileSync(arg, "utf8")));
-        console.log(`saved ${wf.id} (v${wf.version})`);
+        const doc = JSON.parse(fs.readFileSync(arg, "utf8"));
+        if (doc?.format === "naturoflow.workflow") {
+          const { workflow, warnings } = svc.importWorkflow(doc);
+          console.log(`imported ${workflow.id}  ${workflow.name}`);
+          for (const w of warnings) console.log(`  ${w.code}${w.nodeId ? ` ${w.nodeId}` : ""} ${Object.values(w.args).join(" ")}`);
+        } else {
+          const wf = svc.saveWorkflow(doc);
+          console.log(`saved ${wf.id} (v${wf.version})`);
+        }
         break;
       }
       case "workflows":

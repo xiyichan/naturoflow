@@ -141,6 +141,11 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     const { ops, expectedVersion } = (await body(c)) as { ops: never[]; expectedVersion?: number };
     return c.json(svc.applyPatch(c.req.param("id"), ops, expectedVersion));
   });
+  api.get("/workflows/:id/export", (c) => c.json(svc.exportWorkflow(c.req.param("id"))));
+  api.post("/workflows/import", async (c) => {
+    const { doc, name } = (await body(c)) as { doc: unknown; name?: string };
+    return c.json(svc.importWorkflow(doc, { name }), 201);
+  });
   api.get("/workflows/:id/validate", (c) => c.json(svc.validateWorkflow(c.req.param("id"))));
   api.post("/workflows/:id/layout", (c) => c.json(svc.autoLayout(c.req.param("id"))));
   api.post("/workflows/:id/run", async (c) => {

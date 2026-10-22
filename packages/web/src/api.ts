@@ -113,6 +113,12 @@ export interface WorkflowSummary {
   updatedAt: number;
 }
 
+export interface ImportWarning {
+  code: "NODE_TYPE_ADDED" | "MISSING_NODE_TYPE" | "CHOOSE_CREDENTIAL" | "MISSING_FILE" | "TOOL_NAME_TAKEN";
+  nodeId?: string;
+  args: Record<string, string>;
+}
+
 export interface ValidationIssue {
   code: string;
   message: string;
@@ -266,6 +272,9 @@ export const api = {
   workflow: (id: string) => req<Workflow>("GET", `/workflows/${encodeURIComponent(id)}`),
   createWorkflow: (name: string) => req<Workflow>("POST", "/workflows", { name }),
   deleteWorkflow: (id: string) => req<void>("DELETE", `/workflows/${encodeURIComponent(id)}`),
+  exportWorkflow: (id: string) => req<Record<string, unknown>>("GET", `/workflows/${encodeURIComponent(id)}/export`),
+  importWorkflow: (doc: unknown, name?: string) =>
+    req<{ workflow: Workflow; warnings: ImportWarning[] }>("POST", "/workflows/import", { doc, name }),
   patch: (id: string, ops: PatchOp[], expectedVersion?: number) =>
     req<{ workflow: Workflow; issues: ValidationIssue[] }>("POST", `/workflows/${encodeURIComponent(id)}/patch`, { ops, expectedVersion }),
   validate: (id: string) => req<ValidationIssue[]>("GET", `/workflows/${encodeURIComponent(id)}/validate`),

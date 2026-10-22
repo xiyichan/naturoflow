@@ -288,6 +288,7 @@ function WorkflowPanel() {
   const select = useStore((s) => s.select);
   const patch = useStore((s) => s.patch);
   const deleteWorkflow = useStore((s) => s.deleteWorkflow);
+  const exportWorkflow = useStore((s) => s.exportWorkflow);
   const startRun = useStore((s) => s.startRun);
   const notify = useStore((s) => s.notify);
   const [name, setName] = useState(workflow.name);
@@ -365,6 +366,14 @@ function WorkflowPanel() {
           >
             
             {t("清除全部缓存")}
+          </button>
+        </div>
+
+        <h4>{t("导出")}</h4>
+        <p className="nf-muted">{t("导出为 JSON 文件，包含节点、参数、连线和用到的自定义节点类型，可以备份或在别的电脑上导入。凭据和选用的历史结果不会导出。")}</p>
+        <div className="nf-row">
+          <button className="nf-btn" onClick={() => exportWorkflow(workflow.id)}>
+            {t("导出工作流")}
           </button>
         </div>
 

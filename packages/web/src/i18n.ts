@@ -90,6 +90,18 @@ export function localizeDef<T extends { name: string; i18n?: Record<string, Node
   };
 }
 
+/** What to fix by hand after importing a workflow. */
+export function importWarningText(w: { code: string; nodeId?: string; args: Record<string, string> }): string {
+  switch (w.code) {
+    case "NODE_TYPE_ADDED": return t("已添加节点类型 {0}", [w.args.type]);
+    case "MISSING_NODE_TYPE": return t("{0} 的节点类型 {1} 在这里不存在", [w.nodeId, w.args.type]);
+    case "CHOOSE_CREDENTIAL": return t("{0} 需要选择凭据", [w.nodeId]);
+    case "MISSING_FILE": return t("{0} 的本地文件不存在，请重新选择", [w.nodeId]);
+    case "TOOL_NAME_TAKEN": return t("MCP 工具名 {0} 已被占用，没有发布", [w.args.name]);
+    default: return w.code;
+  }
+}
+
 /** Validation issues come from the server in English; rebuild the text from their code and args. */
 export function issueText(i: { code: string; message: string; args?: Record<string, string | number> }): string {
   const a = i.args;
@@ -104,7 +116,7 @@ export function issueText(i: { code: string; message: string; args?: Record<stri
     case "MULTIPLE_EDGES": return t("输入“{0}”接了 {1} 条连线，只能接一条", [a!.port, a!.count]);
     case "PORT_NOT_FOUND": return a!.dir === "output" ? t("{0} 没有输出“{1}”", [a!.node, a!.port]) : t("{0} 没有输入“{1}”", [a!.node, a!.port]);
     case "TYPE_MISMATCH": return t("类型不匹配：{0}（{1}）→ {2}（{3}）", [a!.from, a!.fromType, a!.to, a!.toType]);
-    case "MISSING_CREDENTIAL": return t("请选择 {0} 凭据", [a!.name]);
+    case "MISSING_CREDENTIAL": return t("请选择 {0} 凭据", [a![`name_${lang}`] ?? a!.name]);
     case "CREDENTIAL_NOT_FOUND": return t("选择的凭据已被删除，请重新选择");
     case "CREDENTIAL_TYPE_MISMATCH": return t("凭据“{0}”的类型是 {1}，这里需要 {2}", [a!.name, a!.type, a!.expected]);
     default: return i.message;

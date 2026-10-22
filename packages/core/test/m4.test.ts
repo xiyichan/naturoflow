@@ -523,3 +523,49 @@ describe("publishing", () => {
     expect(svc.listPublished()).toEqual([]);
   });
 });
+
+describe("export / import", () => {
+  it("round-trips a workflow, carrying custom node types and leaving local state behind", async () => {
+    const counterFile = path.join(home, "export-count.txt");
+    svc.saveWorkflow({
+      id: "exp",
+      name: "exported",
+      nodes: [
+        { id: "count", type: "test.counter", params: { file: counterFile } },
+        js("show", "return inputs.input;"),
+        { id: "pic", type: "core.file", params: { path: "/nope/missing.png" } },
+        { id: "gen", type: "seedream.generate", params: { prompt: "hi" }, credential: "local-cred" },
+      ],
+      edges: [edge("count", "n", "show", "input")],
+    });
+    const r = await svc.runWorkflow("exp", {}, {});
+    svc.applyPatch("exp", [{ op: "update_node", id: "count", pin: { runId: r.id } }]);
+
+    const doc = JSON.parse(JSON.stringify(svc.exportWorkflow("exp")));
+    expect(doc.format).toBe("naturoflow.workflow");
+    expect(doc.workflow.id).toBeUndefined();
+    expect(doc.workflow.nodes.find((n: { id: string }) => n.id === "count").pin).toBeUndefined();
+    expect(doc.workflow.nodes.find((n: { id: string }) => n.id === "gen").credential).toBeUndefined();
+    expect(doc.nodeTypes.map((t: { id: string }) => t.id)).toEqual(["test.counter"]);
+
+    // Into a fresh install: the custom type comes along.
+    const home2 = fs.mkdtempSync(path.join(os.tmpdir(), "naturoflow-import-"));
+    const other = new NaturoflowService({ home: home2, allowedBins: [], concurrency: 2, nodeDirs: [examples] });
+    try {
+      const { workflow, warnings } = other.importWorkflow(doc);
+      expect(workflow.id).not.toBe("exp");
+      expect(workflow.edges).toEqual(doc.workflow.edges);
+      expect(other.getNodeType("test.counter").id).toBe("test.counter");
+      const codes = warnings.map((w) => `${w.code}:${w.nodeId ?? w.args.type}`);
+      expect(codes).toEqual(expect.arrayContaining(["NODE_TYPE_ADDED:test.counter", "MISSING_FILE:pic", "CHOOSE_CREDENTIAL:gen"]));
+      expect((await other.runSingleNode(workflow.id, "count")).nodes.count.status).toBe("success");
+    } finally {
+      other.close();
+      fs.rmSync(home2, { recursive: true, force: true });
+    }
+
+    // Into the same install, under another name; garbage is rejected.
+    expect(svc.importWorkflow(doc, { name: "copy" }).workflow.name).toBe("copy");
+    expect(() => svc.importWorkflow({ hello: 1 })).toThrow(/not a naturoflow workflow/);
+  });
+});

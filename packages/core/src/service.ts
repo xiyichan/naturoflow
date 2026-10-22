@@ -12,8 +12,11 @@ import { isFileRef, toFileRef } from "./files.ts";
 import { SecretBox } from "./secrets.ts";
 import { Store } from "./store.ts";
 import {
+  EXPORT_FORMAT,
   NfError,
   ToolPublish,
+  WorkflowExport,
+  type ImportWarning,
   credentialTypeOf,
   type FileRef,
   Workflow,
@@ -23,6 +26,15 @@ import {
   type RunRecord,
   type WorkflowInput,
 } from "./types.ts";
+
+/** `name_<lang>` args for a node type's credential name in other languages, for clients to pick from. */
+function localizedNames(def: { i18n?: Record<string, { credentials?: { name?: string } }> }): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(def.i18n ?? {})
+      .filter(([, v]) => v.credentials?.name)
+      .map(([lang, v]) => [`name_${lang}`, v.credentials!.name!]),
+  );
+}
 
 /** A workflow's callable interface, derived from its core.input / core.output nodes. */
 export interface WorkflowInterface {
@@ -314,6 +326,71 @@ export class NaturoflowService extends EventEmitter {
     return wf;
   }
 
+  /**
+   * A portable copy of a workflow: nodes, params and cables, plus the definitions of custom
+   * node types it uses (HTTP / command / inline-script ones; file-based scripts can't travel).
+   * Saved credentials and chosen past results are local to this machine and are left out.
+   */
+  exportWorkflow(id: string): WorkflowExport {
+    const wf = this.getWorkflow(id);
+    const used = new Set(wf.nodes.map((n) => n.type));
+    const nodeTypes = this.registry
+      .list()
+      .filter((t) => used.has(t.def.id) && t.source && !t.readonly && !(t.def.executor.kind === "script" && t.def.executor.file))
+      .map((t) => t.def);
+    return {
+      format: EXPORT_FORMAT,
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      workflow: {
+        name: wf.name,
+        ...(wf.description ? { description: wf.description } : {}),
+        nodes: wf.nodes.map(({ pin: _pin, credential: _credential, ...n }) => n),
+        edges: wf.edges,
+        ...(wf.tool ? { tool: wf.tool } : {}),
+      },
+      ...(nodeTypes.length ? { nodeTypes } : {}),
+    };
+  }
+
+  /**
+   * Create a new workflow from an export (or a bare workflow object). Custom node types it
+   * carries are added when missing. Returns warnings for things to fix by hand.
+   */
+  importWorkflow(doc: unknown, opts: { name?: string } = {}): { workflow: Workflow; warnings: ImportWarning[] } {
+    const raw = (doc && typeof doc === "object" && "workflow" in doc ? doc : { workflow: doc }) as Record<string, unknown>;
+    const parsed = WorkflowExport.omit({ format: true, formatVersion: true, exportedAt: true }).safeParse(raw);
+    if (!parsed.success) {
+      const i = parsed.error.issues[0];
+      throw new NfError("INVALID_ARGUMENT", `not a naturoflow workflow: ${i.path.join(".")} ${i.message}`);
+    }
+    const { workflow: src, nodeTypes = [] } = parsed.data;
+    const warnings: ImportWarning[] = [];
+
+    for (const def of nodeTypes) {
+      if (this.registry.get(def.id)) continue;
+      this.saveNodeType(def, "create");
+      warnings.push({ code: "NODE_TYPE_ADDED", args: { type: def.id } });
+    }
+    let tool = src.tool;
+    if (tool && this.store.allWorkflows().some((w) => w.tool?.name === tool!.name)) {
+      warnings.push({ code: "TOOL_NAME_TAKEN", args: { name: tool.name } });
+      tool = undefined;
+    }
+    const nodes = src.nodes.map(({ pin: _pin, credential: _credential, ...n }) => n);
+    for (const n of nodes) {
+      const def = this.registry.get(n.type)?.def;
+      if (!def) warnings.push({ code: "MISSING_NODE_TYPE", nodeId: n.id, args: { type: n.type } });
+      else if (credentialTypeOf(def)) warnings.push({ code: "CHOOSE_CREDENTIAL", nodeId: n.id, args: { type: n.type } });
+      const p = n.params?.path;
+      if (n.type === "core.file" && typeof p === "string" && !fs.existsSync(p)) {
+        warnings.push({ code: "MISSING_FILE", nodeId: n.id, args: { path: p } });
+      }
+    }
+    const workflow = this.createWorkflow({ name: opts.name ?? src.name, description: src.description, nodes, edges: src.edges, tool });
+    return { workflow, warnings };
+  }
+
   createWorkflow(input: Partial<WorkflowInput> & { name: string }): Workflow {
     const wf = Workflow.parse({ id: input.id ?? randomUUID().slice(0, 8), ...input, version: 1 });
     if (this.store.getWorkflow(wf.id)) throw new NfError("CONFLICT", `workflow "${wf.id}" already exists`);
@@ -440,7 +517,7 @@ export class NaturoflowService extends EventEmitter {
       if (!def || !type) continue;
       if (!n.credential) {
         if (def.credentials!.required) {
-          issues.push({ code: "MISSING_CREDENTIAL", message: `select a ${def.credentials!.name ?? type} credential`, nodeId: n.id, path: "credential", args: { name: def.credentials!.name ?? type } });
+          issues.push({ code: "MISSING_CREDENTIAL", message: `select a ${def.credentials!.name ?? type} credential`, nodeId: n.id, path: "credential", args: { name: def.credentials!.name ?? type, ...localizedNames(def) } });
         }
         continue;
       }

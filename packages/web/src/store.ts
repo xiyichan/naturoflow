@@ -15,7 +15,7 @@ import {
   type Workflow,
   type WorkflowSummary,
 } from "./api.ts";
-import { localizeDef, t } from "./i18n.ts";
+import { importWarningText, localizeDef, t } from "./i18n.ts";
 
 export interface LightboxItem {
   path: string;
@@ -77,6 +77,8 @@ interface State {
   openWorkflow(id: string): Promise<void>;
   createWorkflow(name: string): Promise<void>;
   deleteWorkflow(id: string): Promise<void>;
+  exportWorkflow(id: string): Promise<void>;
+  importWorkflow(file: File): Promise<void>;
   patch(ops: PatchOp[]): Promise<boolean>;
   layout(): Promise<void>;
   startRun(inputs: Record<string, unknown>, useCache?: boolean): Promise<void>;
@@ -193,6 +195,49 @@ export const useStore = create<State>((set, get) => ({
     const wf = await api.createWorkflow(name);
     set({ workflows: await api.workflows() });
     await get().openWorkflow(wf.id);
+  },
+
+  async exportWorkflow(id) {
+    try {
+      const doc = await api.exportWorkflow(id);
+      const name = (doc.workflow as { name?: string })?.name || id;
+      const blob = new Blob([JSON.stringify(doc, null, 2) + "\n"], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name.replace(/[\\/:*?"<>|]+/g, "_").trim() || id}.naturoflow.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      get().notify("info", t("已导出“{0}”", [name]));
+    } catch (e) {
+      get().notify("error", t("导出失败：{0}", [message(e)]));
+    }
+  },
+
+  async importWorkflow(file) {
+    let doc: unknown;
+    try {
+      doc = JSON.parse(await file.text());
+    } catch {
+      return get().notify("error", t("“{0}”不是有效的 JSON 文件", [file.name]));
+    }
+    try {
+      const { workflow, warnings } = await api.importWorkflow(doc);
+      set({ workflows: await api.workflows() });
+      await get().loadNodeTypes();
+      await get().openWorkflow(workflow.id);
+      // Nodes needing a credential are listed in Checks; here just count them.
+      const creds = warnings.filter((w) => w.code === "CHOOSE_CREDENTIAL").length;
+      const notes = [
+        ...warnings.filter((w) => w.code !== "CHOOSE_CREDENTIAL").map(importWarningText),
+        ...(creds ? [t("{0} 个节点需要重新选择凭据", [creds])] : []),
+      ];
+      get().notify(
+        warnings.some((w) => w.code !== "NODE_TYPE_ADDED") ? "error" : "info",
+        t("已导入“{0}”", [workflow.name]) + (notes.length ? t("：{0}", [notes.join(t("；"))]) : ""),
+      );
+    } catch (e) {
+      get().notify("error", t("导入失败：{0}", [message(e)]));
+    }
   },
 
   async deleteWorkflow(id) {

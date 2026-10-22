@@ -185,6 +185,25 @@ export const Workflow = z.object({
 export type Workflow = z.infer<typeof Workflow>;
 export type WorkflowInput = z.input<typeof Workflow>;
 
+export const EXPORT_FORMAT = "naturoflow.workflow";
+
+/** A workflow as a file: what export writes and import reads. */
+export const WorkflowExport = z.object({
+  format: z.literal(EXPORT_FORMAT),
+  formatVersion: z.number().int(),
+  exportedAt: z.string().optional(),
+  workflow: Workflow.omit({ id: true, version: true }).extend({ id: z.string().optional(), version: z.number().optional() }),
+  /** Definitions of the custom node types the workflow uses. */
+  nodeTypes: z.array(NodeTypeDef).optional(),
+});
+export type WorkflowExport = z.input<typeof WorkflowExport>;
+
+export interface ImportWarning {
+  code: "NODE_TYPE_ADDED" | "MISSING_NODE_TYPE" | "CHOOSE_CREDENTIAL" | "MISSING_FILE" | "TOOL_NAME_TAKEN";
+  nodeId?: string;
+  args: Record<string, string>;
+}
+
 /** How files travel between nodes. */
 export interface FileRef {
   $file: true;

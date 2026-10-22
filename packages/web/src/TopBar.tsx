@@ -11,6 +11,7 @@ export function TopBar() {
   const run = useStore((s) => s.run);
   const openWorkflow = useStore((s) => s.openWorkflow);
   const createWorkflow = useStore((s) => s.createWorkflow);
+  const importWorkflow = useStore((s) => s.importWorkflow);
   const layout = useStore((s) => s.layout);
   const startRun = useStore((s) => s.startRun);
   const cancelRun = useStore((s) => s.cancelRun);
@@ -60,6 +61,19 @@ export function TopBar() {
         
         {t("新建工作流")}
       </button>
+      <label className="nf-btn nf-btn--ghost" title={t("从导出的 JSON 文件新建一个工作流")}>
+        {t("导入")}
+        <input
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) importWorkflow(f);
+          }}
+        />
+      </label>
 
       <span className="nf-spacer" />
 

@@ -233,6 +233,34 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
   );
 
   server.registerTool(
+    "export_workflow",
+    {
+      title: "Export workflow",
+      description:
+        "Get a workflow as a portable JSON document (format naturoflow.workflow): nodes, params, cables, and the custom node types it uses. Saved credentials and chosen past results are left out. Save it to a file to back up or share; import_workflow restores it.",
+      inputSchema: { id: z.string() },
+    },
+    wrap(({ id }) => svc.exportWorkflow(id)),
+  );
+
+  server.registerTool(
+    "import_workflow",
+    {
+      title: "Import workflow",
+      description:
+        "Create a new workflow from a document returned by export_workflow (or a bare workflow object). Missing custom node types it carries are added. Returns the workflow and warnings: nodes that need a credential chosen, missing node types, local files that don't exist here.",
+      inputSchema: {
+        doc: z.record(z.string(), z.any()).describe("the exported document"),
+        name: z.string().optional().describe("name for the new workflow; defaults to the exported name"),
+      },
+    },
+    wrap(({ doc, name }) => {
+      const res = svc.importWorkflow(doc, { name });
+      return { ...res, issues: svc.validateWorkflow(res.workflow.id) };
+    }),
+  );
+
+  server.registerTool(
     "delete_workflow",
     {
       title: "Delete workflow",
