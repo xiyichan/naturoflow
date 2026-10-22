@@ -10,6 +10,7 @@ import { Palette } from "./Palette.tsx";
 import { RunDrawer } from "./RunDrawer.tsx";
 import { useStore } from "./store.ts";
 import { TopBar } from "./TopBar.tsx";
+import { t } from "./i18n.ts";
 
 export function App() {
   const auth = useStore((s) => s.auth);
@@ -38,7 +39,7 @@ export function App() {
     );
   }, [auth]);
 
-  if (auth === "checking") return <div className="nf-splash">正在连接 naturoflow…</div>;
+  if (auth === "checking") return <div className="nf-splash">{t("正在连接 naturoflow…")}</div>;
   if (auth === "needed") return <AuthScreen />;
 
   return (
@@ -80,14 +81,16 @@ function AuthScreen() {
           if (token.trim()) location.href = `/auth?token=${encodeURIComponent(token.trim())}`;
         }}
       >
-        <h1>打开 naturoflow 需要访问令牌</h1>
+        <h1>{t("打开 naturoflow 需要访问令牌")}</h1>
         <p>
-          在终端运行 <code>pnpm nf serve</code>，打开它打印的链接即可自动登录。令牌也保存在{" "}
-          <code>~/.naturoflow/server.json</code> 里，可以粘贴到下面。
+          
+          {t("在终端运行")} <code>pnpm nf serve</code>{t("，打开它打印的链接即可自动登录。令牌也保存在")}{" "}
+          <code>~/.naturoflow/server.json</code>  {t("里，可以粘贴到下面。")}
         </p>
-        <input className="nf-input" value={token} onChange={(e) => setToken(e.target.value)} placeholder="访问令牌" aria-label="访问令牌" />
+        <input className="nf-input" value={token} onChange={(e) => setToken(e.target.value)} placeholder={t("访问令牌")} aria-label={t("访问令牌")} />
         <button className="nf-btn nf-btn--primary" type="submit">
-          登录
+          
+          {t("登录")}
         </button>
       </form>
     </div>

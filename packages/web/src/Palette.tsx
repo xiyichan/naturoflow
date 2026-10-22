@@ -5,15 +5,16 @@ import { DND_TYPE } from "./Canvas.tsx";
 import { freshNodeId } from "./ids.ts";
 import { EXECUTOR_LABELS, typeColor } from "./ports.ts";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 const CATEGORY_LABELS: Record<string, string> = {
-  core: "流程",
-  network: "网络",
-  media: "媒体",
-  script: "脚本",
-  data: "数据",
-  ai: "AI 模型",
-  general: "其他",
+  core: t("流程"),
+  network: t("网络"),
+  media: t("媒体"),
+  script: t("脚本"),
+  data: t("数据"),
+  ai: t("AI 模型"),
+  general: t("其他"),
 };
 
 function Jacks({ ports }: { ports: NodeTypeSummary["inputs"] }) {
@@ -39,29 +40,31 @@ export function Palette() {
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const list = Object.values(types).filter(
-      (t) => !needle || `${t.id} ${t.name} ${t.description ?? ""}`.toLowerCase().includes(needle),
+      (nt) => !needle || `${nt.id} ${nt.name} ${nt.description ?? ""}`.toLowerCase().includes(needle),
     );
     const by = new Map<string, NodeTypeSummary[]>();
-    for (const t of list.sort((a, b) => a.name.localeCompare(b.name))) {
-      by.set(t.category, [...(by.get(t.category) ?? []), t]);
+    for (const nt of list.sort((a, b) => a.name.localeCompare(b.name))) {
+      by.set(nt.category, [...(by.get(nt.category) ?? []), nt]);
     }
     return [...by].sort(([a], [b]) => (a === "core" ? -1 : b === "core" ? 1 : a.localeCompare(b)));
   }, [types, q]);
 
-  const add = async (t: NodeTypeSummary) => {
+  const add = async (nt: NodeTypeSummary) => {
     if (!workflow) return;
-    const id = freshNodeId(t.id, new Set(workflow.nodes.map((n) => n.id)));
+    const id = freshNodeId(nt.id, new Set(workflow.nodes.map((n) => n.id)));
     const maxX = Math.max(0, ...workflow.nodes.map((n) => n.position.x));
-    if (await patch([{ op: "add_node", node: { id, type: t.id, params: {}, position: { x: maxX + 300, y: 80 } } }])) select(id);
+    if (await patch([{ op: "add_node", node: { id, type: nt.id, params: {}, position: { x: maxX + 300, y: 80 } } }])) select(id);
   };
 
   const tabs = (
     <div className="nf-tabs nf-pal__tabs" role="tablist">
       <button role="tab" aria-selected={tab === "nodes"} onClick={() => setTab("nodes")}>
-        节点
+        
+        {t("节点")}
       </button>
       <button role="tab" aria-selected={tab === "assets"} onClick={() => setTab("assets")}>
-        素材
+        
+        {t("素材")}
       </button>
     </div>
   );
@@ -69,7 +72,7 @@ export function Palette() {
   if (tab === "assets") {
     const maxX = Math.max(0, ...(workflow?.nodes ?? []).map((n) => n.position.x));
     return (
-      <aside className="nf-pal" aria-label="素材">
+      <aside className="nf-pal" aria-label={t("素材")}>
         {tabs}
         <Assets onAdd={(files) => addFileNodes(files, { position: { x: maxX + 300, y: 80 } })} />
       </aside>
@@ -77,55 +80,57 @@ export function Palette() {
   }
 
   return (
-    <aside className="nf-pal" aria-label="节点库">
+    <aside className="nf-pal" aria-label={t("节点库")}>
       {tabs}
       <div className="nf-pal__top">
         <input
           className="nf-input"
           type="search"
-          placeholder="搜索节点"
+          placeholder={t("搜索节点")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          aria-label="搜索节点"
+          aria-label={t("搜索节点")}
         />
         <button className="nf-btn nf-btn--ghost" onClick={() => setEditor({ mode: "new" })}>
-          新建节点类型
+          
+          {t("新建节点类型")}
         </button>
       </div>
-      <p className="nf-pal__hint">拖到画布上，或双击添加</p>
+      <p className="nf-pal__hint">{t("拖到画布上，或双击添加")}</p>
       <div className="nf-pal__list">
         {groups.map(([cat, list]) => (
           <section key={cat}>
             <h3 className="nf-pal__cat">{CATEGORY_LABELS[cat] ?? cat}</h3>
             <ul>
-              {list.map((t) => (
-                <li key={t.id}>
+              {list.map((nt) => (
+                <li key={nt.id}>
                   <div
                     className="nf-pal__item"
                     draggable={!!workflow}
                     tabIndex={0}
                     onDragStart={(e) => {
-                      e.dataTransfer.setData(DND_TYPE, t.id);
+                      e.dataTransfer.setData(DND_TYPE, nt.id);
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    onDoubleClick={() => add(t)}
-                    onKeyDown={(e) => e.key === "Enter" && add(t)}
-                    title={t.description ?? t.id}
+                    onDoubleClick={() => add(nt)}
+                    onKeyDown={(e) => e.key === "Enter" && add(nt)}
+                    title={nt.description ?? nt.id}
                   >
-                    <Jacks ports={t.inputs} />
+                    <Jacks ports={nt.inputs} />
                     <span className="nf-pal__name">
-                      {t.name}
-                      <small>{t.id}</small>
+                      {nt.name}
+                      <small>{nt.id}</small>
                     </span>
-                    <Jacks ports={t.outputs} />
-                    <span className="nf-pal__kind">{EXECUTOR_LABELS[t.executor] ?? t.executor}</span>
-                    {t.executor !== "builtin" && (
+                    <Jacks ports={nt.outputs} />
+                    <span className="nf-pal__kind">{EXECUTOR_LABELS[nt.executor] ?? nt.executor}</span>
+                    {nt.executor !== "builtin" && (
                       <button
                         className="nf-pal__edit"
-                        onClick={() => setEditor({ mode: "edit", id: t.id })}
-                        aria-label={`编辑 ${t.name}`}
+                        onClick={() => setEditor({ mode: "edit", id: nt.id })}
+                        aria-label={t("编辑 {0}", [nt.name])}
                       >
-                        编辑
+                        
+                        {t("编辑")}
                       </button>
                     )}
                   </div>

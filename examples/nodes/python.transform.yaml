@@ -18,3 +18,7 @@ executor:
         ns = {"input": inputs.get("input"), "params": params, "log": ctx.log}
         exec(params["code"], ns)
         return {"result": ns.get("result")}
+i18n:
+  en:
+    name: Python script
+    description: Run a Python expression or code; the `result` variable becomes the output.

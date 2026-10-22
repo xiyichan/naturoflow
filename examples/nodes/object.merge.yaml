@@ -14,3 +14,7 @@ executor:
   language: js
   code: |
     export default async ({ inputs }) => ({ value: inputs });
+i18n:
+  en:
+    name: Merge into object
+    description: Merge up to 4 inputs into one object {a, b, c, d}.

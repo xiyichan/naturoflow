@@ -14,3 +14,6 @@ executor:
     info: "{{stdout | fromjson}}"
     duration: "{{stdout | fromjson | get:'format.duration' | number}}"
 cache: true
+i18n:
+  en:
+    name: Media info

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { api, fileUrl, type Artifact, type UploadedFile } from "./api.ts";
 import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 /** Drag payload for a file going onto the canvas. */
 export const DND_FILE = "application/x-naturoflow-file";
@@ -71,11 +72,11 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
     setBusy(true);
     try {
       const saved = await api.upload(files);
-      notify("info", `已上传 ${saved.length} 个文件，拖到画布上就能使用`);
+      notify("info", t("已上传 {0} 个文件，拖到画布上就能使用", [saved.length]));
       setScope("uploads");
       setUploadsVersion((v) => v + 1);
     } catch (e) {
-      notify("error", `上传失败：${(e as Error).message}`);
+      notify("error", t("上传失败：{0}", [(e as Error).message]));
     } finally {
       setBusy(false);
     }
@@ -102,12 +103,12 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
       onDrop={onDrop}
     >
       <div className="nf-assets__top">
-        <div className="nf-seg" role="radiogroup" aria-label="素材范围">
+        <div className="nf-seg" role="radiogroup" aria-label={t("素材范围")}>
           {(
             [
-              ["workflow", "本工作流"],
-              ["all", "全部"],
-              ["uploads", "上传的"],
+              ["workflow", t("本工作流")],
+              ["all", t("全部")],
+              ["uploads", t("上传的")],
             ] as const
           ).map(([k, label]) => (
             <button key={k} role="radio" aria-checked={scope === k} onClick={() => setScope(k)}>
@@ -118,12 +119,12 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
         <div className="nf-assets__row">
           {scope !== "uploads" && (
             <label className="nf-gal__star-filter">
-              <input type="checkbox" checked={starred} onChange={(e) => setStarred(e.target.checked)} /> 只看标星
+              <input type="checkbox" checked={starred} onChange={(e) => setStarred(e.target.checked)} />  {t("只看标星")}
             </label>
           )}
           <span className="nf-spacer" />
           <button className="nf-btn nf-btn--ghost" disabled={busy} onClick={() => input.current?.click()}>
-            {busy ? "上传中…" : "上传文件"}
+            {busy ? t("上传中…") : t("上传文件")}
           </button>
           <input
             ref={input}
@@ -136,12 +137,12 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
             }}
           />
         </div>
-        <p className="nf-pal__hint nf-assets__hint">拖到画布上使用，拖到节点上会自动接到它的文件输入；点 ＋ 直接添加，双击放大查看。也可以把电脑里的文件拖进来。</p>
+        <p className="nf-pal__hint nf-assets__hint">{t("拖到画布上使用，拖到节点上会自动接到它的文件输入；点 ＋ 直接添加，双击放大查看。也可以把电脑里的文件拖进来。")}</p>
       </div>
 
       {items && items.length === 0 ? (
         <p className="nf-muted nf-assets__empty">
-          {scope === "uploads" ? "还没有上传过文件。" : starred ? "没有标星的文件。" : "还没有生成过文件。"}
+          {scope === "uploads" ? t("还没有上传过文件。") : starred ? t("没有标星的文件。") : t("还没有生成过文件。")}
         </p>
       ) : (
         <ul className="nf-assets__grid nf-masonry">
@@ -151,7 +152,7 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
                 className="nf-assets__item"
                 draggable
                 tabIndex={0}
-                title={`${it.sub ?? it.caption}\n${it.path}\n拖到画布使用，双击放大`}
+                title={t("{0}\n{1}\n拖到画布使用，双击放大", [it.sub ?? it.caption, it.path])}
                 onDragStart={(e) => {
                   const payload: DraggedFile = { path: it.path, mime: it.mime, name: label(it) };
                   e.dataTransfer.setData(DND_FILE, JSON.stringify(payload));
@@ -176,8 +177,8 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
                   {it.starred && <i className="nf-assets__star">★</i>}
                   <button
                     className="nf-assets__add"
-                    title="添加到画布"
-                    aria-label="添加到画布"
+                    title={t("添加到画布")}
+                    aria-label={t("添加到画布")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAdd([{ path: it.path, mime: it.mime, name: label(it) }]);

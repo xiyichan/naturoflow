@@ -10,7 +10,7 @@ export interface RegisteredType {
   readonly: boolean;
 }
 
-const WORKFLOW_PARAM = { type: "string", format: "workflow-id", description: "要运行的工作流 id" };
+const WORKFLOW_PARAM = { type: "string", format: "workflow-id", description: "Id of the workflow to run" };
 
 const BUILTIN_TYPES: NodeTypeInput[] = [
   {
@@ -21,7 +21,7 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     params: {
       type: "object",
       properties: {
-        key: { type: "string", description: "输入名" },
+        key: { type: "string", description: "Input name" },
         type: { type: "string", enum: ["any", "string", "number", "boolean", "json", "file"], default: "any" },
         description: { type: "string" },
         required: { type: "boolean", default: true },
@@ -30,16 +30,24 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     },
     outputs: { value: { type: "any" } },
     executor: { kind: "builtin", name: "input" },
+    i18n: {
+      zh: {
+        name: "工作流输入",
+        description: "按 key 读取工作流的一个输入值。用来声明工作流的参数（发布为 MCP 工具时也用它）。",
+        params: { key: "输入名" },
+      },
+    },
   },
   {
     id: "core.output",
     name: "Workflow Output",
     category: "core",
     description: "Exposes its input as workflow output params.key.",
-    params: { type: "object", properties: { key: { type: "string", description: "输出名" } } },
+    params: { type: "object", properties: { key: { type: "string", description: "Output name" } } },
     inputs: { value: { type: "any" } },
     outputs: { value: { type: "any" } },
     executor: { kind: "builtin", name: "output" },
+    i18n: { zh: { name: "工作流输出", description: "把输入作为工作流的一个输出（名字为 key）。", params: { key: "输出名" } } },
   },
   {
     id: "core.const",
@@ -48,6 +56,7 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     params: { type: "object", properties: { value: {} } },
     outputs: { value: { type: "any" } },
     executor: { kind: "builtin", name: "const" },
+    i18n: { zh: { name: "常量" } },
   },
   {
     id: "core.file",
@@ -57,10 +66,17 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     params: {
       type: "object",
       required: ["path"],
-      properties: { path: { type: "string", format: "file-path", description: "本地文件路径（素材面板拖进来时自动填写）" } },
+      properties: { path: { type: "string", format: "file-path", description: "Local file path (filled in when dragged from the assets panel)" } },
     },
     outputs: { file: { type: "file" } },
     executor: { kind: "builtin", name: "file" },
+    i18n: {
+      zh: {
+        name: "文件",
+        description: "送进工作流的一个文件：生成的结果、上传的文件或任意本地路径。",
+        params: { path: "本地文件路径（素材面板拖进来时自动填写）" },
+      },
+    },
   },
   {
     id: "core.if",
@@ -71,11 +87,18 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     params: {
       type: "object",
       properties: {
-        condition: { type: "string", default: "value", description: "JS 表达式，例如 value.status === 200" },
+        condition: { type: "string", default: "value", description: "JS expression, e.g. value.status === 200" },
       },
     },
     outputs: { true: { type: "any", required: false }, false: { type: "any", required: false } },
     executor: { kind: "builtin", name: "if" },
+    i18n: {
+      zh: {
+        name: "条件分支",
+        description: "把 value 送到 true 或 false 输出。condition 是基于 value / inputs / params 的 JS 表达式，另一侧会被跳过。",
+        params: { condition: "JS 表达式，例如 value.status === 200" },
+      },
+    },
   },
   {
     id: "core.subflow",
@@ -86,6 +109,13 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
     params: { type: "object", required: ["workflow"], properties: { workflow: WORKFLOW_PARAM } },
     outputs: { outputs: { type: "json" } },
     executor: { kind: "builtin", name: "subflow" },
+    i18n: {
+      zh: {
+        name: "子工作流",
+        description: "运行另一个工作流。inputs 是它的运行输入对象，outputs 是它的运行输出对象。",
+        params: { workflow: "要运行的工作流 id" },
+      },
+    },
   },
   {
     id: "core.map",
@@ -98,14 +128,25 @@ const BUILTIN_TYPES: NodeTypeInput[] = [
       required: ["workflow"],
       properties: {
         workflow: WORKFLOW_PARAM,
-        itemKey: { type: "string", default: "item", description: "每一项传给子工作流时用的输入名" },
-        pick: { type: "string", description: "只取子工作流的这个输出；留空则取全部输出" },
+        itemKey: { type: "string", default: "item", description: "Input name each item is passed to the subflow as" },
+        pick: { type: "string", description: "Take only this subflow output; leave empty for all outputs" },
         concurrency: { type: "integer", default: 4, minimum: 1 },
         continueOnError: { type: "boolean", default: false },
       },
     },
     outputs: { results: { type: "list<any>" }, errors: { type: "list<string>", required: false } },
     executor: { kind: "builtin", name: "map" },
+    i18n: {
+      zh: {
+        name: "逐项运行",
+        description: "对列表里的每一项运行一次工作流。每次的输入是 { [itemKey]: 当前项, index, ...context }，results 是所有输出组成的列表。",
+        params: {
+          workflow: "要运行的工作流 id",
+          itemKey: "每一项传给子工作流时用的输入名",
+          pick: "只取子工作流的这个输出；留空则取全部输出",
+        },
+      },
+    },
   },
 ];
 

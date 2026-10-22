@@ -99,3 +99,41 @@ executor:
   file: s3.upload.mjs
 timeout: 30m
 retry: { max: 1, backoff: 3s }
+i18n:
+  en:
+    name: S3 upload
+    description: >-
+      Upload files to S3 or S3-compatible storage (works as image hosting). url is a presigned link by default
+      (opens even for private buckets, up to 7 days); the public address is in public_url.
+      Accepts one file or a list (such as Seedream's files output). Signed with SigV4, path-style addresses by default.
+    credentials:
+      name: S3 storage
+      fields:
+        endpoint:
+          description: The storage address, e.g. https://s3.amazonaws.com or a third-party one such as https://us1-dcs-s3.bifrostcloud.com
+        region:
+          label: Region
+          description: Region used for signing; defaults to us-east-1 (accepted by most third-party storage)
+        bucket:
+          label: Default bucket
+        public_base_url:
+          label: Public base URL
+          description: Optional. A CDN / custom domain for image hosting; returned urls are built from it plus the key. Otherwise Endpoint/bucket/key is used
+        addressing:
+          label: Addressing
+          description: Defaults to path-style (Endpoint/bucket/key); set virtual-hosted to use bucket.Endpoint/key
+    inputs:
+      file: The file to upload, or a list of files
+    params:
+      bucket: Leave empty to use the credential's default bucket
+      key: "Object key template; may use {date} {time} {uuid} {name} {ext} {filename} {index}. With several files include {name}, {uuid} or {index}, or they overwrite each other"
+      acl: Leave empty for the bucket's default permissions. Choose public-read for direct public access (the storage must allow ACLs)
+      content_type: Leave empty to detect from the file type
+      cache_control: e.g. public, max-age=31536000
+      url_type: "Which link the url output gives. presigned (default): a presigned link that opens even for private buckets and expires; public: the object's public address, needs a publicly readable bucket or object"
+      presign_expires: Presigned link lifetime in seconds, up to 7 days (604800)
+    outputs:
+      url: Link to the first file (presigned by default, see the url_type param); can go straight into Seedream and other nodes
+      presigned_url: Presigned download link for the first file
+      public_url: Public address of the first file (won't open if the bucket is private)
+      uploads: Each file's bucket, key, url, presigned_url, etag and size

@@ -24,6 +24,8 @@ export interface ValidationIssue {
   message: string;
   nodeId?: string;
   path?: string;
+  /** Values interpolated into `message`, so clients can show it in their own language. */
+  args?: Record<string, string | number>;
 }
 
 export type EngineEvent =
@@ -53,22 +55,22 @@ export function validateWorkflow(wf: Workflow, registry: NodeRegistry): Validati
   for (const n of wf.nodes) {
     const t = registry.get(n.type);
     if (!t) {
-      issues.push({ code: "NODE_TYPE_NOT_FOUND", message: `unknown node type "${n.type}"`, nodeId: n.id });
+      issues.push({ code: "NODE_TYPE_NOT_FOUND", message: `unknown node type "${n.type}"`, nodeId: n.id, args: { type: n.type } });
       continue;
     }
     const props = (t.def.params.properties ?? {}) as Record<string, { default?: unknown }>;
     for (const req of (t.def.params.required ?? []) as string[]) {
       if (n.params[req] === undefined && props[req]?.default === undefined) {
-        issues.push({ code: "MISSING_PARAM", message: `param "${req}" is required`, nodeId: n.id, path: `params.${req}` });
+        issues.push({ code: "MISSING_PARAM", message: `param "${req}" is required`, nodeId: n.id, args: { param: req }, path: `params.${req}` });
       }
     }
     for (const [port, def] of Object.entries(t.def.inputs)) {
       const incoming = wf.edges.filter((e) => e.to.node === n.id && e.to.port === port);
       if (def.required && incoming.length === 0) {
-        issues.push({ code: "UNCONNECTED_INPUT", message: `input "${port}" is not connected`, nodeId: n.id, path: `inputs.${port}` });
+        issues.push({ code: "UNCONNECTED_INPUT", message: `input "${port}" is not connected`, nodeId: n.id, args: { port }, path: `inputs.${port}` });
       }
       if (incoming.length > 1) {
-        issues.push({ code: "MULTIPLE_EDGES", message: `input "${port}" has ${incoming.length} incoming edges`, nodeId: n.id });
+        issues.push({ code: "MULTIPLE_EDGES", message: `input "${port}" has ${incoming.length} incoming edges`, nodeId: n.id, args: { port, count: incoming.length } });
       }
     }
   }
@@ -84,16 +86,17 @@ export function validateWorkflow(wf: Workflow, registry: NodeRegistry): Validati
     const fromPort = registry.get(from.type)?.def.outputs[e.from.port];
     const toPort = registry.get(to.type)?.def.inputs[e.to.port];
     if (registry.get(from.type) && !fromPort) {
-      issues.push({ code: "PORT_NOT_FOUND", message: `${from.id} has no output "${e.from.port}"`, path: where });
+      issues.push({ code: "PORT_NOT_FOUND", message: `${from.id} has no output "${e.from.port}"`, path: where, args: { node: from.id, port: e.from.port, dir: "output" } });
     }
     if (registry.get(to.type) && !toPort) {
-      issues.push({ code: "PORT_NOT_FOUND", message: `${to.id} has no input "${e.to.port}"`, path: where });
+      issues.push({ code: "PORT_NOT_FOUND", message: `${to.id} has no input "${e.to.port}"`, path: where, args: { node: to.id, port: e.to.port, dir: "input" } });
     }
     if (fromPort && toPort && !portCompatible(fromPort.type, toPort.type)) {
       issues.push({
         code: "TYPE_MISMATCH",
         message: `${from.id}.${e.from.port} (${fromPort.type}) -> ${to.id}.${e.to.port} (${toPort.type})`,
         path: where,
+        args: { from: `${from.id}.${e.from.port}`, fromType: fromPort.type, to: `${to.id}.${e.to.port}`, toType: toPort.type },
       });
     }
   }

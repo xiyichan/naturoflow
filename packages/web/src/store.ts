@@ -15,6 +15,7 @@ import {
   type Workflow,
   type WorkflowSummary,
 } from "./api.ts";
+import { localizeDef, t } from "./i18n.ts";
 
 export interface LightboxItem {
   path: string;
@@ -147,7 +148,7 @@ export const useStore = create<State>((set, get) => ({
   },
   async pinResult(nodeId, runId) {
     if (await get().patch([{ op: "update_node", id: nodeId, pin: runId ? { runId } : null }])) {
-      get().notify("info", runId ? `${nodeId} 已选用这次的结果，运行时不再重新执行它` : `${nodeId} 已取消选用，运行时会正常执行`);
+      get().notify("info", runId ? t("{0} 已选用这次的结果，运行时不再重新执行它", [nodeId]) : t("{0} 已取消选用，运行时会正常执行", [nodeId]));
     }
   },
   setView(view) {
@@ -157,25 +158,25 @@ export const useStore = create<State>((set, get) => ({
   async init() {
     try {
       const [types, workflows] = await Promise.all([api.nodeTypes(), api.workflows()]);
-      set({ auth: "ok", nodeTypes: Object.fromEntries(types.map((t) => [t.id, t])), workflows });
+      set({ auth: "ok", nodeTypes: Object.fromEntries(types.map((nt) => [nt.id, localizeDef(nt)])), workflows });
       const last = storage.get(LAST_WF);
       const first = workflows.find((w) => w.id === last) ?? workflows[0];
       if (first) await get().openWorkflow(first.id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) set({ auth: "needed" });
-      else get().notify("error", `无法连接服务：${message(e)}`);
+      else get().notify("error", t("无法连接服务：{0}", [message(e)]));
     }
   },
 
   async loadNodeTypes() {
     const types = await api.nodeTypes();
-    set({ nodeTypes: Object.fromEntries(types.map((t) => [t.id, t])), defs: {} });
+    set({ nodeTypes: Object.fromEntries(types.map((nt) => [nt.id, localizeDef(nt)])), defs: {} });
   },
 
   async loadDef(id) {
     const cached = get().defs[id];
     if (cached) return cached;
-    const def = await api.nodeType(id);
+    const def = localizeDef(await api.nodeType(id));
     set((s) => ({ defs: { ...s.defs, [id]: def } }));
     return def;
   },
@@ -211,7 +212,7 @@ export const useStore = create<State>((set, get) => ({
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
-        get().notify("info", "工作流刚被别处修改过（可能是 AI），已刷新到最新版本，请重试");
+        get().notify("info", t("工作流刚被别处修改过（可能是 AI），已刷新到最新版本，请重试"));
         await get().openWorkflow(wf.id);
       } else get().notify("error", message(e));
       return false;
@@ -264,7 +265,7 @@ export const useStore = create<State>((set, get) => ({
         const wired = Math.min(free.length, files.length);
         get().notify(
           wired ? "info" : "error",
-          wired ? `已接到 ${target.label || target.id} 的 ${free.slice(0, wired).join("、")}` : `${target.label || target.id} 没有空着的文件输入，素材节点已放在它旁边`,
+          wired ? t("已接到 {0} 的 {1}", [target.label || target.id, free.slice(0, wired).join("、")]) : t("{0} 没有空着的文件输入，素材节点已放在它旁边", [target.label || target.id]),
         );
       }
     }
@@ -297,7 +298,7 @@ export const useStore = create<State>((set, get) => ({
     } catch (e) {
       const issues = e instanceof ApiError ? e.issues : undefined;
       if (issues) set({ issues });
-      get().notify("error", issues ? "工作流还有问题，修好后再运行" : message(e));
+      get().notify("error", issues ? t("工作流还有问题，修好后再运行") : message(e));
     }
   },
 
@@ -350,7 +351,7 @@ export const useStore = create<State>((set, get) => ({
         set({ workflows: s.workflows.filter((w) => w.id !== e.id) });
         if (e.id === wfId) {
           set({ workflow: null, run: null });
-          s.notify("info", "当前工作流已被删除");
+          s.notify("info", t("当前工作流已被删除"));
         }
         break;
       case "nodeType.changed":
@@ -416,10 +417,10 @@ export const useStore = create<State>((set, get) => ({
             s.notify(
               n?.status === "success" ? "info" : "error",
               n?.status !== "success"
-                ? `${e.run.single.nodeId} 单独运行失败${n?.error ? `：${n.error}` : ""}`
+                ? t("{0} 单独运行失败{1}", [e.run.single.nodeId, n?.error ? t("：{0}", [n.error]) : ""])
                 : pinned
-                  ? `${e.run.single.nodeId} 生成了新结果，但它仍选用着之前的结果，下游不会用新的。要用新的，在卡片上点「改用这次」`
-                  : `${e.run.single.nodeId} 单独运行完成`,
+                  ? t("{0} 生成了新结果，但它仍选用着之前的结果，下游不会用新的。要用新的，在卡片上点「改用这次」", [e.run.single.nodeId])
+                  : t("{0} 单独运行完成", [e.run.single.nodeId]),
             );
           }
           break;
@@ -427,7 +428,7 @@ export const useStore = create<State>((set, get) => ({
         if (e.run.workflowId === wfId && !e.run.parentRunId) {
           set({ run: s.run?.id === e.run.id || !s.run ? e.run : s.run, runs: s.runs.map((r) => (r.id === e.run.id ? e.run : r)) });
           if (s.run?.id === e.run.id) {
-            s.notify(e.run.status === "success" ? "info" : "error", e.run.status === "success" ? "运行完成" : `运行${e.run.status === "cancelled" ? "已取消" : "失败"}${e.run.error ? `：${e.run.error}` : ""}`);
+            s.notify(e.run.status === "success" ? "info" : "error", e.run.status === "success" ? t("运行完成") : t("运行{0}{1}", [e.run.status === "cancelled" ? t("已取消") : t("失败"), e.run.error ? t("：{0}", [e.run.error]) : ""]));
           }
         }
         break;

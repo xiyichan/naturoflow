@@ -25,3 +25,7 @@ executor:
     status: "{{status}}"
 timeout: 60s
 retry: { max: 2, backoff: 1s }
+i18n:
+  en:
+    name: HTTP request
+    description: A general HTTP request. The body is sent as JSON; returns the parsed response body.

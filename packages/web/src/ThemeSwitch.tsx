@@ -1,12 +1,13 @@
 import { useState } from "react";
+import { lang, setLang, t, type Lang } from "./i18n.ts";
 
 type Theme = "system" | "light" | "dark";
 const KEY = "naturoflow.theme";
 
 function read(): Theme {
   try {
-    const t = localStorage.getItem(KEY);
-    return t === "light" || t === "dark" ? t : "system";
+    const v = localStorage.getItem(KEY);
+    return v === "light" || v === "dark" ? v : "system";
   } catch {
     return "system";
   }
@@ -15,26 +16,43 @@ function read(): Theme {
 /** Appearance: follow the system, or force light / dark (remembered per browser). */
 export function ThemeSwitch() {
   const [theme, setTheme] = useState<Theme>(read);
-  const pick = (t: Theme) => {
-    setTheme(t);
-    if (t === "system") delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = t;
+  const pick = (v: Theme) => {
+    setTheme(v);
+    if (v === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = v;
     try {
-      if (t === "system") localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, t);
+      if (v === "system") localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, v);
     } catch {
       // storage unavailable: the choice lasts for this page only
     }
   };
   const opts: [Theme, string, string][] = [
-    ["system", "自动", "跟随系统外观"],
-    ["light", "浅色", "浅色外观"],
-    ["dark", "深色", "深色外观"],
+    ["system", t("自动"), t("跟随系统外观")],
+    ["light", t("浅色"), t("浅色外观")],
+    ["dark", t("深色"), t("深色外观")],
   ];
   return (
-    <div className="nf-seg nf-theme" role="radiogroup" aria-label="外观">
-      {opts.map(([t, label, title]) => (
-        <button key={t} role="radio" aria-checked={theme === t} title={title} onClick={() => pick(t)}>
+    <div className="nf-seg nf-theme" role="radiogroup" aria-label={t("外观")}>
+      {opts.map(([v, label, title]) => (
+        <button key={v} role="radio" aria-checked={theme === v} title={title} onClick={() => pick(v)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Interface language. Each option is labelled in its own language; switching reloads the page. */
+export function LangSwitch() {
+  const opts: [Lang, string][] = [
+    ["zh", "中文"],
+    ["en", "English"],
+  ];
+  return (
+    <div className="nf-seg nf-theme" role="radiogroup" aria-label={t("语言")}>
+      {opts.map(([v, label]) => (
+        <button key={v} role="radio" aria-checked={lang === v} lang={v === "zh" ? "zh-CN" : "en"} onClick={() => v !== lang && setLang(v)}>
           {label}
         </button>
       ))}

@@ -15,3 +15,6 @@ executor:
   outputs:
     file: "{{body}}"
 timeout: 10m
+i18n:
+  en:
+    name: Download file

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type WheelEvent } from "react";
 import { fileUrl } from "./api.ts";
 import { useStore, type LightboxItem } from "./store.ts";
+import { t } from "./i18n.ts";
 
 const MIN = 0.05;
 const MAX = 16;
@@ -109,7 +110,7 @@ function Viewer({
   const pct = Math.round(view.scale * 100);
 
   return (
-    <div className="nf-lb" role="dialog" aria-modal="true" aria-label="查看大图">
+    <div className="nf-lb" role="dialog" aria-modal="true" aria-label={t("查看大图")}>
       <div
         ref={stage}
         className="nf-lb__stage"
@@ -140,16 +141,16 @@ function Viewer({
         ) : item.mime.startsWith("audio/") ? (
           <audio src={url} controls autoPlay />
         ) : (
-          <p className="nf-lb__nopreview">这种文件不能预览，点下面的「打开原文件」。</p>
+          <p className="nf-lb__nopreview">{t("这种文件不能预览，点下面的「打开原文件」。")}</p>
         )}
 
-        {failed && <p className="nf-lb__nopreview">图片加载失败：链接可能已过期（Seedream 的链接 24 小时内有效）或没有访问权限。</p>}
+        {failed && <p className="nf-lb__nopreview">{t("图片加载失败：链接可能已过期（Seedream 的链接 24 小时内有效）或没有访问权限。")}</p>}
         {count > 1 && (
           <>
-            <button className="nf-lb__nav nf-lb__nav--prev" onClick={() => onStep(-1)} aria-label="上一张">
+            <button className="nf-lb__nav nf-lb__nav--prev" onClick={() => onStep(-1)} aria-label={t("上一张")}>
               ‹
             </button>
-            <button className="nf-lb__nav nf-lb__nav--next" onClick={() => onStep(1)} aria-label="下一张">
+            <button className="nf-lb__nav nf-lb__nav--next" onClick={() => onStep(1)} aria-label={t("下一张")}>
               ›
             </button>
           </>
@@ -167,20 +168,22 @@ function Viewer({
         </div>
         {isImage && (
           <div className="nf-lb__zoom">
-            <button onClick={() => zoomAt(view.scale / 1.25)} aria-label="缩小">−</button>
+            <button onClick={() => zoomAt(view.scale / 1.25)} aria-label={t("缩小")}>−</button>
             <span>{pct}%</span>
-            <button onClick={() => zoomAt(view.scale * 1.25)} aria-label="放大">+</button>
-            <button onClick={fit} data-on={view.fit || undefined}>适应窗口</button>
+            <button onClick={() => zoomAt(view.scale * 1.25)} aria-label={t("放大")}>+</button>
+            <button onClick={fit} data-on={view.fit || undefined}>{t("适应窗口")}</button>
             <button onClick={() => zoomAt(1)} data-on={!view.fit && pct === 100 ? true : undefined}>
               1:1
             </button>
           </div>
         )}
         <a className="nf-lb__btn" href={url} target="_blank" rel="noreferrer">
-          打开原文件
+          
+          {t("打开原文件")}
         </a>
         <button className="nf-lb__btn" onClick={onClose}>
-          关闭
+          
+          {t("关闭")}
         </button>
       </footer>
     </div>

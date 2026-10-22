@@ -120,6 +120,28 @@ export const NodeTypeDef = z.object({
    */
   cache: z.boolean().default(false),
   credentials: CredentialSpec.optional(),
+  /**
+   * UI texts in other languages, keyed by language code:
+   * `i18n: { en: { name, description, params: {key: help}, inputs: {port: help}, outputs, credentials: { name, fields: {key: {label, description}} } } }`.
+   */
+  i18n: z
+    .record(
+      z.string(),
+      z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        params: z.record(z.string(), z.string()).optional(),
+        inputs: z.record(z.string(), z.string()).optional(),
+        outputs: z.record(z.string(), z.string()).optional(),
+        credentials: z
+          .object({
+            name: z.string().optional(),
+            fields: z.record(z.string(), z.object({ label: z.string().optional(), description: z.string().optional() })).optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
 });
 export type NodeTypeDef = z.infer<typeof NodeTypeDef>;
 export type NodeTypeInput = z.input<typeof NodeTypeDef>;

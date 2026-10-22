@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { JsonSchema } from "./api.ts";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 /**
  * Renders a form from a node type's params JSON Schema. Scalars get native inputs;
@@ -16,7 +17,7 @@ export function ParamForm({
   onChange: (key: string, v: unknown) => void;
 }) {
   const props = Object.entries(schema.properties ?? {});
-  if (!props.length) return <p className="nf-muted">这个节点没有可配置的参数。</p>;
+  if (!props.length) return <p className="nf-muted">{t("这个节点没有可配置的参数。")}</p>;
   const required = new Set(schema.required ?? []);
   return (
     <div className="nf-form">
@@ -46,10 +47,11 @@ function Field({
   const label = (
     <label htmlFor={id} className="nf-field__label">
       <span>{schema.title ?? name}</span>
-      {required && <em>必填</em>}
+      {required && <em>{t("必填")}</em>}
       {!isDefault && schema.default !== undefined && (
         <button type="button" className="nf-link" onClick={() => onChange(undefined)}>
-          恢复默认
+          
+          {t("恢复默认")}
         </button>
       )}
     </label>
@@ -62,7 +64,7 @@ function Field({
   } else if (schema.enum) {
     control = (
       <select id={id} className="nf-input" value={String(shown ?? "")} onChange={(e) => onChange(e.target.value || undefined)}>
-        {(!required || schema.default === undefined) && <option value="">（未设置）</option>}
+        {(!required || schema.default === undefined) && <option value="">{t("（未设置）")}</option>}
         {schema.enum.map((o) => (
           <option key={String(o)} value={String(o)}>
             {String(o)}
@@ -79,9 +81,9 @@ function Field({
         value={shown === undefined ? "" : String(shown)}
         onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "true")}
       >
-        <option value="">（未设置）</option>
-        <option value="true">是</option>
-        <option value="false">否</option>
+        <option value="">{t("（未设置）")}</option>
+        <option value="true">{t("是")}</option>
+        <option value="false">{t("否")}</option>
       </select>
     );
   } else if (schema.type === "boolean") {
@@ -98,7 +100,7 @@ function Field({
     control = long ? (
       <textarea id={id} className="nf-input nf-code" rows={6} spellCheck={false} value={String(shown ?? "")} onChange={(e) => set(e.target.value)} />
     ) : (
-      <input id={id} className="nf-input" value={String(shown ?? "")} placeholder={schema.default === undefined ? "未设置" : undefined} onChange={(e) => set(e.target.value)} />
+      <input id={id} className="nf-input" value={String(shown ?? "")} placeholder={schema.default === undefined ? t("未设置") : undefined} onChange={(e) => set(e.target.value)} />
     );
   } else {
     control = <JsonInput id={id} value={shown} onChange={onChange} />;
@@ -158,7 +160,7 @@ function JsonInput({ id, value, onChange }: { id: string; value: unknown; onChan
             onChange(JSON.parse(text));
             setError(null);
           } catch {
-            setError("不是合法的 JSON，没有保存");
+            setError(t("不是合法的 JSON，没有保存"));
           }
         }}
       />
@@ -175,19 +177,20 @@ function WorkflowPicker({ id, value, onChange }: { id: string; value: unknown; o
   return (
     <div className="nf-picker">
       <select id={id} className="nf-input" value={v} onChange={(e) => onChange(e.target.value || undefined)}>
-        <option value="">选择工作流</option>
+        <option value="">{t("选择工作流")}</option>
         {workflows
           .filter((w) => w.id !== current)
           .map((w) => (
             <option key={w.id} value={w.id}>
-              {w.name}（{w.id}）
+              {t("{0}（{1}）", [w.name, w.id])}
             </option>
           ))}
-        {v && !workflows.some((w) => w.id === v) && <option value={v}>{v}（不存在）</option>}
+        {v && !workflows.some((w) => w.id === v) && <option value={v}>{v}{t("（不存在）")}</option>}
       </select>
       {v && workflows.some((w) => w.id === v) && (
         <button type="button" className="nf-link" onClick={() => openWorkflow(v)}>
-          打开
+          
+          {t("打开")}
         </button>
       )}
     </div>

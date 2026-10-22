@@ -206,6 +206,7 @@ export class NaturoflowService extends EventEmitter {
       executor: def.executor.kind,
       inputs: def.inputs,
       outputs: def.outputs,
+      i18n: def.i18n,
       source,
       readonly,
     }));
@@ -418,14 +419,14 @@ export class NaturoflowService extends EventEmitter {
       if (!def || !type) continue;
       if (!n.credential) {
         if (def.credentials!.required) {
-          issues.push({ code: "MISSING_CREDENTIAL", message: `select a ${def.credentials!.name ?? type} credential`, nodeId: n.id, path: "credential" });
+          issues.push({ code: "MISSING_CREDENTIAL", message: `select a ${def.credentials!.name ?? type} credential`, nodeId: n.id, path: "credential", args: { name: def.credentials!.name ?? type } });
         }
         continue;
       }
       const c = this.store.getCredential(n.credential);
-      if (!c) issues.push({ code: "CREDENTIAL_NOT_FOUND", message: `credential "${n.credential}" no longer exists`, nodeId: n.id, path: "credential" });
+      if (!c) issues.push({ code: "CREDENTIAL_NOT_FOUND", message: `credential "${n.credential}" no longer exists`, nodeId: n.id, path: "credential", args: { id: n.credential } });
       else if (c.type !== type) {
-        issues.push({ code: "CREDENTIAL_TYPE_MISMATCH", message: `credential "${c.name}" is a ${c.type} credential, expected ${type}`, nodeId: n.id, path: "credential" });
+        issues.push({ code: "CREDENTIAL_TYPE_MISMATCH", message: `credential "${c.name}" is a ${c.type} credential, expected ${type}`, nodeId: n.id, path: "credential", args: { name: c.name, type: c.type, expected: type } });
       }
     }
     return issues;

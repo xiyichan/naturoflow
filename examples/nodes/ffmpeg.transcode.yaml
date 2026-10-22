@@ -22,3 +22,6 @@ executor:
     video: "{{ctx.outDir}}/out.{{params.ext}}"
 timeout: 30m
 cache: true
+i18n:
+  en:
+    name: FFmpeg transcode

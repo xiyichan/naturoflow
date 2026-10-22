@@ -1,6 +1,7 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type Edge as RFEdge, type EdgeProps } from "@xyflow/react";
 import type { Edge } from "./api.ts";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 export type CableEdgeType = RFEdge<{ edge: Edge }, "cable">;
 
@@ -15,8 +16,8 @@ export function CableEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, 
           <button
             className="nf-cable__cut nodrag nopan"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            title="断开这条连线（Delete）"
-            aria-label="断开连线"
+            title={t("断开这条连线（Delete）")}
+            aria-label={t("断开连线")}
             // Act on pointer down: by click time the pane would already have deselected the edge
             // (unmounting this button).
             onPointerDown={(e) => {

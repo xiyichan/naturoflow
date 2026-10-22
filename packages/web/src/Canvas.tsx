@@ -20,6 +20,7 @@ import { FlowNode, type FlowNodeType } from "./FlowNode.tsx";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible, typeColor } from "./ports.ts";
 import { useStore } from "./store.ts";
+import { issueText, t } from "./i18n.ts";
 
 const nodeTypes = { nf: FlowNode };
 const edgeTypes = { cable: CableEdge };
@@ -45,7 +46,7 @@ export function Canvas() {
   // Server state -> React Flow nodes. Positions come from the server except while dragging.
   useEffect(() => {
     if (!workflow) return setNodes([]);
-    const issueByNode = new Map(issues.filter((i) => i.nodeId).map((i) => [i.nodeId!, i.message]));
+    const issueByNode = new Map(issues.filter((i) => i.nodeId).map((i) => [i.nodeId!, issueText(i)]));
     setNodes((prev) => {
       const dragging = new Map(prev.filter((n) => n.dragging).map((n) => [n.id, n.position]));
       return workflow.nodes.map((n) => ({
@@ -187,7 +188,7 @@ export function Canvas() {
           try {
             files = (await api.upload(osFiles)).map((f) => ({ path: f.path, mime: f.mime, name: f.path.split("/").pop() ?? "file" }));
           } catch (e) {
-            return notify("error", `上传失败：${(e as Error).message}`);
+            return notify("error", t("上传失败：{0}", [(e as Error).message]));
           }
         }
         await addFileNodes(files, { position: { x: Math.round(p.x), y: Math.round(p.y) }, target });
@@ -208,8 +209,8 @@ export function Canvas() {
   if (!workflow) {
     return (
       <div className="nf-empty">
-        <p>还没有打开的工作流。</p>
-        <p>在顶栏新建一个，或者让 AI 通过 MCP 调用 <code>create_workflow</code>，它会马上出现在这里。</p>
+        <p>{t("还没有打开的工作流。")}</p>
+        <p>{t("在顶栏新建一个，或者让 AI 通过 MCP 调用")} <code>create_workflow</code>{t("，它会马上出现在这里。")}</p>
       </div>
     );
   }

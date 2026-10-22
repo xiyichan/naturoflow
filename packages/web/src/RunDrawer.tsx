@@ -1,13 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 const STATUS_TEXT: Record<string, string> = {
-  pending: "等待",
-  running: "运行中",
-  success: "成功",
-  failed: "失败",
-  skipped: "跳过",
-  cancelled: "取消",
+  pending: t("等待"),
+  running: t("运行中"),
+  success: t("成功"),
+  failed: t("失败"),
+  skipped: t("跳过"),
+  cancelled: t("取消"),
 };
 
 /** Bottom strip: one chip per node for the current run, expandable to the combined log. */
@@ -31,10 +32,10 @@ export function RunDrawer() {
   if (!run || run.workflowId !== workflow?.id) return null;
 
   return (
-    <section className="nf-drawer" data-open={open || undefined} aria-label="运行日志">
+    <section className="nf-drawer" data-open={open || undefined} aria-label={t("运行日志")}>
       <div className="nf-drawer__bar">
         <button className="nf-btn nf-btn--ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
-          {open ? "收起日志" : "展开日志"}
+          {open ? t("收起日志") : t("展开日志")}
         </button>
         <span className="nf-drawer__run" data-status={run.status}>
           {STATUS_TEXT[run.status]}
@@ -51,7 +52,7 @@ export function RunDrawer() {
       </div>
       {open && (
         <pre ref={logRef} className="nf-log nf-drawer__log">
-          {lines.length ? lines.join("\n") : "这次运行还没有日志输出。"}
+          {lines.length ? lines.join("\n") : t("这次运行还没有日志输出。")}
         </pre>
       )}
     </section>

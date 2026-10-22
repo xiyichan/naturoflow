@@ -1,3 +1,4 @@
+import { t } from "./i18n.ts";
 export { portCompatible } from "../../core/src/ports.ts";
 
 /** Each data type has its own cable color; this is the canvas's main visual language. */
@@ -17,22 +18,22 @@ export function typeColor(type: string | undefined): string {
 }
 
 export const TYPE_LABELS: Record<string, string> = {
-  file: "文件",
+  file: t("文件"),
   json: "JSON",
-  string: "文本",
-  number: "数字",
-  boolean: "布尔",
-  any: "任意",
+  string: t("文本"),
+  number: t("数字"),
+  boolean: t("布尔"),
+  any: t("任意"),
 };
 
 export function typeLabel(type: string): string {
-  if (type.startsWith("list<")) return `${TYPE_LABELS[type.slice(5, -1)] ?? type.slice(5, -1)} 列表`;
+  if (type.startsWith("list<")) return t("{0} 列表", [TYPE_LABELS[type.slice(5, -1)] ?? type.slice(5, -1)]);
   return TYPE_LABELS[type] ?? type;
 }
 
 export const EXECUTOR_LABELS: Record<string, string> = {
   http: "HTTP",
-  command: "命令",
-  script: "脚本",
-  builtin: "内置",
+  command: t("命令"),
+  script: t("脚本"),
+  builtin: t("内置"),
 };

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "./store.ts";
-import { ThemeSwitch } from "./ThemeSwitch.tsx";
+import { LangSwitch, ThemeSwitch } from "./ThemeSwitch.tsx";
+import { t } from "./i18n.ts";
 
 export function TopBar() {
   const workflows = useStore((s) => s.workflows);
@@ -26,11 +27,11 @@ export function TopBar() {
       <span className="nf-brand">naturoflow</span>
       <select
         className="nf-input nf-top__wf"
-        aria-label="切换工作流"
+        aria-label={t("切换工作流")}
         value={workflow?.id ?? ""}
         onChange={(e) => e.target.value && openWorkflow(e.target.value)}
       >
-        {!workflow && <option value="">选择工作流</option>}
+        {!workflow && <option value="">{t("选择工作流")}</option>}
         {workflows.map((w) => (
           <option key={w.id} value={w.id}>
             {w.name}
@@ -38,30 +39,34 @@ export function TopBar() {
         ))}
       </select>
       {workflow && (
-        <div className="nf-seg nf-top__views" role="tablist" aria-label="视图">
+        <div className="nf-seg nf-top__views" role="tablist" aria-label={t("视图")}>
           <button role="tab" aria-selected={view === "canvas"} onClick={() => setView("canvas")}>
-            画布
+            
+            {t("画布")}
           </button>
           <button role="tab" aria-selected={view === "gallery"} onClick={() => setView("gallery")}>
-            生成结果
+            
+            {t("生成结果")}
           </button>
         </div>
       )}
       <button
         className="nf-btn nf-btn--ghost"
         onClick={() => {
-          const name = prompt("新工作流的名称");
+          const name = prompt(t("新工作流的名称"));
           if (name?.trim()) createWorkflow(name.trim());
         }}
       >
-        新建工作流
+        
+        {t("新建工作流")}
       </button>
 
       <span className="nf-spacer" />
 
+      <LangSwitch />
       <ThemeSwitch />
-      <span className="nf-sync" data-on={connected || undefined} title={connected ? "画布与服务实时同步，AI 的修改会马上出现" : "与服务断开，正在重连"}>
-        {connected ? "实时同步中" : "已断开，重连中"}
+      <span className="nf-sync" data-on={connected || undefined} title={connected ? t("画布与服务实时同步，AI 的修改会马上出现") : t("与服务断开，正在重连")}>
+        {connected ? t("实时同步中") : t("已断开，重连中")}
       </span>
 
       {workflow && (
@@ -73,16 +78,18 @@ export function TopBar() {
               setView("canvas");
               select(null);
             }}
-            title="在右侧查看检查结果"
+            title={t("在右侧查看检查结果")}
           >
-            {issues.length ? `${issues.length} 个问题` : "检查通过"}
+            {issues.length ? t("{0} 个问题", [issues.length]) : t("检查通过")}
           </button>
           <button className="nf-btn nf-btn--ghost" onClick={layout}>
-            自动排列
+            
+            {t("自动排列")}
           </button>
           {running ? (
             <button className="nf-btn nf-btn--stop" onClick={cancelRun}>
-              停止运行
+              
+              {t("停止运行")}
             </button>
           ) : (
             <div className="nf-runwrap">
@@ -90,7 +97,8 @@ export function TopBar() {
                 className="nf-btn nf-btn--primary"
                 onClick={() => (inputNodes.length ? setAskInputs(true) : startRun({}))}
               >
-                运行
+                
+                {t("运行")}
               </button>
               {askInputs && (
                 <RunInputs
@@ -146,7 +154,7 @@ function RunInputs({
       }}
       onKeyDown={(e) => e.key === "Escape" && onCancel()}
     >
-      <p className="nf-pop__title">运行输入</p>
+      <p className="nf-pop__title">{t("运行输入")}</p>
       {keys.map(({ key }, i) => (
         <label key={key} className="nf-field">
           <span className="nf-field__label">{key}</span>
@@ -160,10 +168,12 @@ function RunInputs({
       ))}
       <div className="nf-pop__actions">
         <button type="button" className="nf-btn nf-btn--ghost" onClick={onCancel}>
-          取消
+          
+          {t("取消")}
         </button>
         <button type="submit" className="nf-btn nf-btn--primary">
-          运行
+          
+          {t("运行")}
         </button>
       </div>
     </form>

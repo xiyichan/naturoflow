@@ -931,3 +931,9 @@ select.nf-input { padding-right: 24px; }
 .nf-runs button { flex-wrap: nowrap; white-space: nowrap; }
 .nf-runs__time { font-variant-numeric: tabular-nums; }
 .nf-runs .nf-tag { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* The top bar gets crowded with both switches: keep the sync status on one line, and show only its dot when narrow. */
+.nf-sync { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 1100px) {
+  .nf-sync { font-size: 0; gap: 0; }
+}

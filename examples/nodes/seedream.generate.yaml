@@ -122,3 +122,45 @@ executor:
   file: seedream.generate.mjs
 # Billed per image, so never retried automatically.
 timeout: 10m
+i18n:
+  en:
+    name: Seedream image
+    description: >-
+      BytePlus ModelArk Seedream image generation, mainly for Seedream 5.0: text-to-image, image-to-image, multi-image fusion,
+      interactive edits (mark regions in the prompt with <bbox>x1 y1 x2 y2</bbox>), layer decomposition and transparent backgrounds.
+      Reference images come in through the image (image 1), image_2 (image 2)… ports as local files (sent as base64) or URLs, or as URLs in the params.
+      Generated images are downloaded locally; the file / files outputs can be previewed or passed downstream. Only params you set are sent.
+    credentials:
+      fields:
+        api_key:
+          description: Create one on the API Key page of the ModelArk console
+        base_url:
+          label: Base URL
+          description: Leave empty for the official https://ark.ap-southeast.bytepluses.com/api/v3; set your own for a proxy or another region (up to /api/v3 or /v1)
+    inputs:
+      image: Image 1. A local file (sent as base64), a URL (e.g. an S3 upload's output) or a list of them
+      image_2: Image 2. For multi-image fusion, refer to them as "image 1", "image 2" in the prompt, in port order
+      image_3: Image 3
+      image_4: Image 4
+    params:
+      prompt: >-
+        Prompt; up to about 600 English words is recommended. For interactive edits mark regions with <bbox>x1 y1 x2 y2</bbox> (0–1000 normalized).
+        Can be omitted for layer decomposition, the model finds the main elements. May use {{workflow.inputs.xxx}}
+      model: "Model ID or Endpoint ID. From the docs: dola-seedream-5-0-pro-260628 (5.0 pro), seedream-5-0-260128 (used in the group / streaming examples); see the ModelArk console for others"
+      image: Extra reference image URLs or local paths, one per line, after the images from ports. Up to 10 for 5.0 pro / flash, 14 for 5.0 lite / 4.5 / 4.0
+      layer_decomposition: "Layer decomposition: split one image into a base plus up to 16 transparent layers (PNG). Needs exactly one reference image. 5.0 pro / flash only"
+      size: "Resolution tier 1K / 1.5K / 2K (5.0 pro / flash; layer decomposition also accepts auto), or pixels such as 2048x1024 (1280x720 to about 2048x2048 in total). Defaults to 2K"
+      optimize_prompt_mode: Prompt optimization mode (optimize_prompt_options.mode). fast is quicker with slightly lower quality; 5.0 pro only
+      output_format: Output format, 5.0 series only. With layer decomposition it affects only the base; layers are always png. Defaults to jpeg
+      background: "transparent makes a transparent background: needs one reference image with an alpha channel (e.g. png), and output must be png. 5.0 pro / flash only"
+      watermark: Add an “AI-generated” watermark in the bottom-right corner; defaults to the API's default (on)
+      response_format: url returns a link valid for 24 hours; b64_json returns the image data. Both are saved as local files
+      sequential_image_generation: "Image groups: with auto the model decides how many related images to make from the prompt. 5.0 lite / 4.5 / 4.0 only; leave empty for 5.0 pro / flash"
+      max_images: Maximum images in a group (reference images + generated ≤ 15); group mode only
+      download: Save generated images locally (file / files outputs). Turn off to return links only
+    outputs:
+      file: The first image (the base image for layer decomposition)
+      files: All images as local files
+      url: Link to the first image (valid for 24 hours)
+      images: The API's data[] (size, output_format, plus z_index / name / description / bounding_box for layers) with the matching local files
+      layers: "Layer decomposition result: each layer's z_index, name, description, bounding box and file"

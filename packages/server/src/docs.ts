@@ -118,6 +118,19 @@ executor:
 A workflow node's param value may itself be a template over that node's \`inputs\` and the run's inputs:
 \`{ "duration": "{{workflow.inputs.seconds}}" }\`. This is how a workflow input reaches a param.
 
+## Translations
+The canvas UI is shown in Chinese or English. Write \`name\`, \`description\` and help texts in one language and add the
+other under \`i18n\`, keyed by language (\`zh\` or \`en\`); anything left out falls back to the main text:
+\`\`\`yaml
+i18n:
+  en:
+    name: Video to GIF
+    description: Convert a video into an animated GIF
+    params: { fps: Frames per second }       # param key -> help text
+    inputs: { video: The video to convert }  # port -> help text (outputs: likewise)
+    credentials: { name: My API, fields: { api_key: { label: API key, description: Where to find it } } }
+\`\`\`
+
 ## Caching
 \`cache: true\` on a node type (or \`cache\` on a workflow node) reuses outputs when the type definition, params and
 inputs (files by path + size + mtime) match an earlier execution. Only enable it for deterministic nodes.

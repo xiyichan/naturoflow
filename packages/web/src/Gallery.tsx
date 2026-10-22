@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, fileUrl, type Artifact } from "./api.ts";
 import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 const KINDS: { label: string; mime?: string }[] = [
-  { label: "全部" },
-  { label: "图片", mime: "image/" },
-  { label: "视频", mime: "video/" },
-  { label: "音频", mime: "audio/" },
+  { label: t("全部") },
+  { label: t("图片"), mime: "image/" },
+  { label: t("视频"), mime: "video/" },
+  { label: t("音频"), mime: "audio/" },
 ];
 
 function when(ts: number) {
@@ -32,7 +33,7 @@ function headline(a: Artifact) {
 }
 
 function toLightbox(a: Artifact) {
-  return { path: a.path, mime: a.mime, title: headline(a) || undefined, sub: `${a.nodeLabel || a.nodeId}，${new Date(a.createdAt).toLocaleString()}${a.note ? `，${a.note}` : ""}` };
+  return { path: a.path, mime: a.mime, title: headline(a) || undefined, sub: `${a.nodeLabel || a.nodeId}${t("，")}${new Date(a.createdAt).toLocaleString()}${a.note ? `，${a.note}` : ""}` };
 }
 
 /** Own params plus upstream params as "node.param", for comparing whole chains. */
@@ -46,7 +47,7 @@ function Thumb({ a, big }: { a: Artifact; big?: boolean }) {
   const url = fileUrl(a.path);
   if (a.mime.startsWith("image/")) return <img src={url} alt={headline(a) || a.path} loading="lazy" />;
   if (a.mime.startsWith("video/")) return <video src={url} preload="metadata" muted controls={big} loop={big} />;
-  if (a.mime.startsWith("audio/")) return big ? <audio src={url} controls /> : <span className="nf-gal__icon">音频</span>;
+  if (a.mime.startsWith("audio/")) return big ? <audio src={url} controls /> : <span className="nf-gal__icon">{t("音频")}</span>;
   return <span className="nf-gal__icon">{a.path.split(".").pop()?.toUpperCase()}</span>;
 }
 
@@ -90,7 +91,7 @@ export function Gallery() {
   const togglePick = (path: string) =>
     setPicked((p) => (p.includes(path) ? p.filter((x) => x !== path) : p.length >= 4 ? [...p.slice(1), path] : [...p, path]));
 
-  if (!workflow) return <div className="nf-empty"><p>先打开一个工作流。</p></div>;
+  if (!workflow) return <div className="nf-empty"><p>{t("先打开一个工作流。")}</p></div>;
   const current = items?.find((a) => a.path === selected);
   const pickedItems = picked.map((p) => items?.find((a) => a.path === p)).filter(Boolean) as Artifact[];
 
@@ -98,16 +99,16 @@ export function Gallery() {
     <>
       <main className="nf-gal">
         <div className="nf-gal__bar">
-          <span className="nf-gal__count">{items ? `${items.length}${nextBefore ? "+" : ""} 个文件` : "加载中…"}</span>
-          <div className="nf-seg" role="radiogroup" aria-label="文件类型">
+          <span className="nf-gal__count">{items ? t("{0}{1} 个文件", [items.length, nextBefore ? "+" : ""]) : t("加载中…")}</span>
+          <div className="nf-seg" role="radiogroup" aria-label={t("文件类型")}>
             {KINDS.map((k, i) => (
               <button key={k.label} role="radio" aria-checked={kind === i} onClick={() => setKind(i)}>
                 {k.label}
               </button>
             ))}
           </div>
-          <select className="nf-input nf-gal__node" value={nodeId} onChange={(e) => setNodeId(e.target.value)} aria-label="按节点筛选">
-            <option value="">所有节点</option>
+          <select className="nf-input nf-gal__node" value={nodeId} onChange={(e) => setNodeId(e.target.value)} aria-label={t("按节点筛选")}>
+            <option value="">{t("所有节点")}</option>
             {workflow.nodes
               .filter((n) => !n.type.startsWith("core.") || n.type === "core.map" || n.type === "core.subflow")
               .map((n) => (
@@ -117,23 +118,25 @@ export function Gallery() {
               ))}
           </select>
           <label className="nf-gal__star-filter">
-            <input type="checkbox" checked={starredOnly} onChange={(e) => setStarredOnly(e.target.checked)} /> 只看标星
+            <input type="checkbox" checked={starredOnly} onChange={(e) => setStarredOnly(e.target.checked)} />  {t("只看标星")}
           </label>
           <span className="nf-spacer" />
           {picked.length > 0 && (
             <button className="nf-btn nf-btn--ghost" onClick={() => setPicked([])}>
-              清除勾选
+              
+              {t("清除勾选")}
             </button>
           )}
           <button className="nf-btn nf-btn--primary" disabled={pickedItems.length < 2} onClick={() => setComparing(true)}>
-            对比所选（{pickedItems.length}）
+            
+            {t("对比所选（{0}）", [pickedItems.length])}
           </button>
         </div>
 
         {items && items.length === 0 ? (
           <div className="nf-empty">
-            <p>{starredOnly || nodeId || kind ? "没有符合筛选条件的文件。" : "这个工作流还没有生成过文件。"}</p>
-            <p>运行后，生成的图片、视频、音频都会出现在这里，最新的在最前面。</p>
+            <p>{starredOnly || nodeId || kind ? t("没有符合筛选条件的文件。") : t("这个工作流还没有生成过文件。")}</p>
+            <p>{t("运行后，生成的图片、视频、音频都会出现在这里，最新的在最前面。")}</p>
           </div>
         ) : (
           <ul className="nf-gal__grid nf-masonry">
@@ -143,7 +146,7 @@ export function Gallery() {
                   className="nf-gal__card"
                   onClick={() => setSelected(a.path)}
                   onDoubleClick={() => openLightbox(items.map(toLightbox), items.indexOf(a))}
-                  title={`${headline(a) || a.path}\n双击放大`}
+                  title={t("{0}\n双击放大", [headline(a) || a.path])}
                 >
                   <span className="nf-gal__media">
                     <Thumb a={a} />
@@ -155,15 +158,15 @@ export function Gallery() {
                   {headline(a) && <span className="nf-gal__prompt">{headline(a)}</span>}
                   {a.note && <span className="nf-gal__note">{a.note}</span>}
                 </button>
-                <label className="nf-gal__pick" title="勾选后可以对比">
-                  <input type="checkbox" checked={picked.includes(a.path)} onChange={() => togglePick(a.path)} aria-label="勾选对比" />
+                <label className="nf-gal__pick" title={t("勾选后可以对比")}>
+                  <input type="checkbox" checked={picked.includes(a.path)} onChange={() => togglePick(a.path)} aria-label={t("勾选对比")} />
                 </label>
                 <button
                   className="nf-gal__star"
                   data-on={a.starred || undefined}
                   onClick={() => update(a.path, { starred: !a.starred })}
-                  aria-label={a.starred ? "取消标星" : "标星"}
-                  title={a.starred ? "取消标星" : "标星"}
+                  aria-label={a.starred ? t("取消标星") : t("标星")}
+                  title={a.starred ? t("取消标星") : t("标星")}
                 >
                   ★
                 </button>
@@ -172,7 +175,8 @@ export function Gallery() {
             {nextBefore && (
               <li className="nf-gal__more">
                 <button className="nf-btn" onClick={loadMore}>
-                  加载更早的
+                  
+                  {t("加载更早的")}
                 </button>
               </li>
             )}
@@ -180,8 +184,8 @@ export function Gallery() {
         )}
       </main>
 
-      <aside className="nf-insp" aria-label="文件详情">
-        {current ? <Detail key={current.path} a={current} onMark={(m) => update(current.path, m)} /> : <p className="nf-muted nf-insp__body">选一个文件查看详情。</p>}
+      <aside className="nf-insp" aria-label={t("文件详情")}>
+        {current ? <Detail key={current.path} a={current} onMark={(m) => update(current.path, m)} /> : <p className="nf-muted nf-insp__body">{t("选一个文件查看详情。")}</p>}
       </aside>
 
       {comparing && <Compare items={pickedItems} onClose={() => setComparing(false)} onMark={update} />}
@@ -198,13 +202,13 @@ function Detail({ a, onMark }: { a: Artifact; onMark: (m: Partial<Pick<Artifact,
 
   return (
     <>
-      <div className="nf-gal__big" title="双击放大" onDoubleClick={() => useStore.getState().openLightbox([toLightbox(a)])}>
+      <div className="nf-gal__big" title={t("双击放大")} onDoubleClick={() => useStore.getState().openLightbox([toLightbox(a)])}>
         <Thumb a={a} big />
       </div>
       <div className="nf-insp__body">
         <div className="nf-row nf-gal__actions">
           <button className="nf-btn" data-on={a.starred || undefined} onClick={() => onMark({ starred: !a.starred })}>
-            {a.starred ? "★ 已标星" : "☆ 标星"}
+            {a.starred ? t("★ 已标星") : t("☆ 标星")}
           </button>
           <button
             className="nf-btn nf-btn--ghost"
@@ -214,60 +218,63 @@ function Detail({ a, onMark }: { a: Artifact; onMark: (m: Partial<Pick<Artifact,
               setView("canvas");
             }}
           >
-            在画布上查看这次运行
+            
+            {t("在画布上查看这次运行")}
           </button>
           <a className="nf-btn nf-btn--ghost" href={fileUrl(a.path)} target="_blank" rel="noreferrer">
-            打开原文件
+            
+            {t("打开原文件")}
           </a>
         </div>
         <label className="nf-field">
-          <span className="nf-field__label">备注</span>
+          <span className="nf-field__label">{t("备注")}</span>
           <textarea
             className="nf-input"
             rows={2}
             value={note}
-            placeholder="比如：这张构图最好、字太小"
+            placeholder={t("比如：这张构图最好、字太小")}
             onChange={(e) => setNote(e.target.value)}
             onBlur={() => note !== a.note && onMark({ note })}
           />
         </label>
         <dl className="nf-gal__meta">
-          <dt>节点</dt>
+          <dt>{t("节点")}</dt>
           <dd>
             {a.nodeLabel || a.nodeId} <code>{a.nodeType}</code>
           </dd>
-          <dt>输出</dt>
+          <dt>{t("输出")}</dt>
           <dd>
             <code>{a.port}</code>
           </dd>
-          <dt>生成时间</dt>
+          <dt>{t("生成时间")}</dt>
           <dd>
             {new Date(a.createdAt).toLocaleString()}
-            {a.single && <span className="nf-tag">单独运行</span>}
-            {a.rerunOf && <span className="nf-tag">重跑</span>}
+            {a.single && <span className="nf-tag">{t("单独运行")}</span>}
+            {a.rerunOf && <span className="nf-tag">{t("重跑")}</span>}
           </dd>
-          <dt>文件</dt>
+          <dt>{t("文件")}</dt>
           <dd>
-            {a.mime}，{sizeOf(a.size)}
+            {a.mime}{t("，")}{sizeOf(a.size)}
             <br />
             <code className="nf-gal__path">{a.path}</code>
           </dd>
         </dl>
         {a.params && Object.keys(a.params).length > 0 && (
           <>
-            <h4>当时的参数（{a.nodeLabel || a.nodeId}）</h4>
+            <h4>{t("当时的参数（{0}）", [a.nodeLabel || a.nodeId])}</h4>
             <ParamTable params={a.params} />
           </>
         )}
         {(a.lineage ?? []).map((l) => (
           <div key={l.nodeId}>
             <h4>
-              上游 {l.nodeLabel || l.nodeId} <code>{l.nodeType}</code>
+              
+              {t("上游")} {l.nodeLabel || l.nodeId} <code>{l.nodeType}</code>
             </h4>
             {l.params && Object.keys(l.params).length ? (
               <ParamTable params={l.params} />
             ) : (
-              <p className="nf-muted">这次运行没有记录它的参数（发生在记录参数功能上线之前）。</p>
+              <p className="nf-muted">{t("这次运行没有记录它的参数（发生在记录参数功能上线之前）。")}</p>
             )}
           </div>
         ))}
@@ -308,38 +315,39 @@ function Compare({ items, onClose, onMark }: { items: Artifact[]; onClose: () =>
   const sameNode = new Set(items.map((a) => a.nodeId)).size === 1;
 
   return (
-    <div className="nf-cmp" role="dialog" aria-modal="true" aria-label="对比">
+    <div className="nf-cmp" role="dialog" aria-modal="true" aria-label={t("对比")}>
       <header className="nf-cmp__head">
-        <h2>对比 {items.length} 个结果</h2>
+        <h2>{t("对比 {0} 个结果", [items.length])}</h2>
         <span className="nf-muted">
           {merged.every((p) => !Object.keys(p).length)
-            ? "这些结果没有记录参数（发生在记录参数功能上线之前），只能看图对比"
+            ? t("这些结果没有记录参数（发生在记录参数功能上线之前），只能看图对比")
             : merged.some((p) => !Object.keys(p).length)
-              ? "部分结果没有记录参数；其余参数的差异已高亮"
+              ? t("部分结果没有记录参数；其余参数的差异已高亮")
               : differs.size
-                ? `参数不同的地方已高亮：${[...differs].join("、")}`
+                ? t("参数不同的地方已高亮：{0}", [[...differs].join("、")])
                 : sameNode
-                  ? "参数完全相同（只是又生成了一次）"
-                  : "来自不同节点"}
+                  ? t("参数完全相同（只是又生成了一次）")
+                  : t("来自不同节点")}
         </span>
         <span className="nf-spacer" />
         <button className="nf-btn" onClick={onClose}>
-          关闭
+          
+          {t("关闭")}
         </button>
       </header>
       <div className="nf-cmp__cols" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((a) => (
           <section key={a.path} className="nf-cmp__col">
-            <div className="nf-cmp__media" title="双击放大" onDoubleClick={() => useStore.getState().openLightbox(items.map(toLightbox), items.indexOf(a))}>
+            <div className="nf-cmp__media" title={t("双击放大")} onDoubleClick={() => useStore.getState().openLightbox(items.map(toLightbox), items.indexOf(a))}>
               <Thumb a={a} big />
             </div>
             <div className="nf-cmp__info">
               <div className="nf-row">
                 <button className="nf-btn" data-on={a.starred || undefined} onClick={() => onMark(a.path, { starred: !a.starred })}>
-                  {a.starred ? "★ 已标星" : "☆ 标星"}
+                  {a.starred ? t("★ 已标星") : t("☆ 标星")}
                 </button>
                 <span className="nf-muted">
-                  {a.nodeLabel || a.nodeId}，{when(a.createdAt)}
+                  {a.nodeLabel || a.nodeId}{t("，")}{when(a.createdAt)}
                 </span>
               </div>
               {a.note && <p className="nf-gal__note">{a.note}</p>}

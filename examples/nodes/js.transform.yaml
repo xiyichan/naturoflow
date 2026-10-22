@@ -18,3 +18,7 @@ executor:
       const fn = new Function("inputs", "params", "ctx", `return (async () => { ${params.code} })()`);
       return { result: await fn(inputs, params, ctx) };
     };
+i18n:
+  en:
+    name: JS script
+    description: Run JS in a worker thread. The code param is a function body with access to inputs / params; its return value is the result output.

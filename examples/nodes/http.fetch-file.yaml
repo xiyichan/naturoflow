@@ -14,3 +14,7 @@ executor:
     file: "{{body}}"
 timeout: 5m
 retry: { max: 2, backoff: 2s }
+i18n:
+  en:
+    name: Fetch URL as file
+    description: Download a URL from upstream (e.g. an image link returned by Seedream) as a local file you can preview on the canvas and pass to ffmpeg and other nodes.

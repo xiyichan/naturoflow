@@ -5,6 +5,7 @@ import { NodeResults } from "./NodeResults.tsx";
 import { EXECUTOR_LABELS, typeColor, typeLabel } from "./ports.ts";
 import { guessMime } from "./mime.ts";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 export type FlowNodeData = {
   node: WorkflowNode;
@@ -17,12 +18,12 @@ export type FlowNodeData = {
 export type FlowNodeType = Node<FlowNodeData, "nf">;
 
 const STATUS_TEXT: Record<string, string> = {
-  pending: "等待",
-  running: "运行中",
-  success: "完成",
-  failed: "失败",
-  skipped: "跳过",
-  cancelled: "取消",
+  pending: t("等待"),
+  running: t("运行中"),
+  success: t("完成"),
+  failed: t("失败"),
+  skipped: t("跳过"),
+  cancelled: t("取消"),
 };
 
 function duration(run?: NodeRun) {
@@ -48,15 +49,15 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
     >
       <header className="nf-node__head">
         <span className="nf-node__title">{node.label || type?.name || node.type}</span>
-        {node.pin && <span className="nf-node__pinned" title="已选用一次历史结果，运行时不再执行这个节点">已选用</span>}
-        <span className="nf-node__kind">{type ? EXECUTOR_LABELS[type.executor] ?? type.executor : "未知类型"}</span>
+        {node.pin && <span className="nf-node__pinned" title={t("已选用一次历史结果，运行时不再执行这个节点")}>{t("已选用")}</span>}
+        <span className="nf-node__kind">{type ? EXECUTOR_LABELS[type.executor] ?? type.executor : t("未知类型")}</span>
       </header>
       <div className="nf-node__sub">
         <code>{node.id}</code>
         {status && status !== "pending" && (
           <span className="nf-node__status">
-            {status === "skipped" && run?.note ? "未走此分支" : STATUS_TEXT[status]}{" "}
-            {run?.cached ? (run.cached === "cache" ? "（缓存）" : run.cached === "pin" ? "（已选用）" : "（沿用）") : duration(run)}
+            {status === "skipped" && run?.note ? t("未走此分支") : STATUS_TEXT[status]}{" "}
+            {run?.cached ? (run.cached === "cache" ? t("（缓存）") : run.cached === "pin" ? t("（已选用）") : t("（沿用）")) : duration(run)}
           </span>
         )}
       </div>
@@ -68,7 +69,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
               src={fileUrl(node.params.path)}
               alt=""
               draggable={false}
-              title="双击放大"
+              title={t("双击放大")}
               onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -83,7 +84,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
       <div className="nf-node__ports">
         <div className="nf-node__col">
           {inputs.map(([name, p]) => (
-            <div key={name} className="nf-port nf-port--in" title={`${name}: ${typeLabel(p.type)}${p.required ? "" : "（可选）"}`}>
+            <div key={name} className="nf-port nf-port--in" title={`${name}: ${typeLabel(p.type)}${p.required ? "" : t("（可选）")}`}>
               <Handle
                 type="target"
                 position={Position.Left}

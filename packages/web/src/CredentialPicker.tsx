@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type CredentialInfo, type CredentialSpec, type WorkflowNode } from "./api.ts";
 import { useStore } from "./store.ts";
+import { t } from "./i18n.ts";
 
 /**
  * Per-node credential choice for node types that declare `credentials`.
@@ -27,39 +28,41 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
   const title = spec.name ?? credType;
 
   return (
-    <section className="nf-cred" aria-label="凭据">
+    <section className="nf-cred" aria-label={t("凭据")}>
       <div className="nf-field__label">
-        <span>凭据：{title}</span>
-        {spec.required && <em>必填</em>}
+        <span>{t("凭据：")}{title}</span>
+        {spec.required && <em>{t("必填")}</em>}
       </div>
       {list && list.length === 0 ? (
-        <p className="nf-muted nf-cred__empty">还没有保存过 {title} 的凭据。填好下面的信息保存后，这个节点就会使用它。</p>
+        <p className="nf-muted nf-cred__empty">{t("还没有保存过 {0} 的凭据。填好下面的信息保存后，这个节点就会使用它。", [title])}</p>
       ) : (
         <div className="nf-cred__row">
           <select
             className="nf-input"
-            aria-label="选择凭据"
+            aria-label={t("选择凭据")}
             value={node.credential ?? ""}
             onChange={(e) => choose(e.target.value || null)}
           >
-            <option value="">{spec.required ? "请选择凭据" : "不使用凭据"}</option>
+            <option value="">{spec.required ? t("请选择凭据") : t("不使用凭据")}</option>
             {list?.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-            {node.credential && list && !selected && <option value={node.credential}>（已删除的凭据）</option>}
+            {node.credential && list && !selected && <option value={node.credential}>{t("（已删除的凭据）")}</option>}
           </select>
           {selected && mode === "view" && (
             <button type="button" className="nf-link" onClick={() => setMode("edit")}>
-              管理
+              
+              {t("管理")}
             </button>
           )}
         </div>
       )}
       {mode === "view" && (
         <button type="button" className="nf-btn nf-cred__add" onClick={() => setMode("new")}>
-          新建凭据
+          
+          {t("新建凭据")}
         </button>
       )}
       {mode === "new" && (
@@ -69,7 +72,7 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
           onSave={async (name, data) => {
             const c = await api.createCredential(credType, name, data);
             await choose(c.id);
-            notify("info", `已保存凭据“${c.name}”，并用在这个节点上`);
+            notify("info", t("已保存凭据“{0}”，并用在这个节点上", [c.name]));
             setMode("view");
           }}
         />
@@ -81,16 +84,16 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
           onCancel={() => setMode("view")}
           onSave={async (name, data) => {
             await api.updateCredential(selected.id, { name, data });
-            notify("info", `已更新凭据“${name}”`);
+            notify("info", t("已更新凭据“{0}”", [name]));
             setMode("view");
           }}
           onDelete={async () => {
             const usage = await api.credentialUsage(selected.id);
             const others = usage.filter((u) => u.nodeId !== node.id || u.workflowId !== useStore.getState().workflow?.id).length;
-            const msg = `删除凭据“${selected.name}”？${others ? `另外还有 ${others} 个节点在用它，它们会提示需要重新选择凭据。` : ""}`;
+            const msg = t("删除凭据“{0}”？{1}", [selected.name, others ? t("另外还有 {0} 个节点在用它，它们会提示需要重新选择凭据。", [others]) : ""]);
             if (!confirm(msg)) return;
             await api.deleteCredential(selected.id);
-            notify("info", `已删除凭据“${selected.name}”`);
+            notify("info", t("已删除凭据“{0}”", [selected.name]));
             setMode("view");
           }}
         />
@@ -138,8 +141,8 @@ function CredentialForm({
       }}
     >
       <label className="nf-field">
-        <span className="nf-field__label">名称</span>
-        <input className="nf-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：key 1、公司账号" required autoFocus />
+        <span className="nf-field__label">{t("名称")}</span>
+        <input className="nf-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("例如：key 1、公司账号")} required autoFocus />
       </label>
       {Object.entries(spec.fields).map(([key, f]) => {
         const stored = existing?.fields.includes(key);
@@ -147,32 +150,34 @@ function CredentialForm({
           <label key={key} className="nf-field">
             <span className="nf-field__label">
               <span>{f.label ?? key}</span>
-              {f.required && !existing && <em>必填</em>}
+              {f.required && !existing && <em>{t("必填")}</em>}
             </span>
             <input
               className="nf-input nf-code"
               type={f.secret ? "password" : "text"}
               autoComplete="off"
               value={data[key] ?? ""}
-              placeholder={existing && f.secret && stored ? "已保存，留空则不修改" : ""}
+              placeholder={existing && f.secret && stored ? t("已保存，留空则不修改") : ""}
               onChange={(e) => setData({ ...data, [key]: e.target.value })}
             />
             {f.description && <small className="nf-field__help">{f.description}</small>}
           </label>
         );
       })}
-      <p className="nf-muted nf-cred__note">加密保存在本机，界面和 AI 都看不到明文，运行日志里会打码。</p>
+      <p className="nf-muted nf-cred__note">{t("加密保存在本机，界面和 AI 都看不到明文，运行日志里会打码。")}</p>
       {error && <p className="nf-field__error">{error}</p>}
       <div className="nf-row">
         <button type="submit" className="nf-btn nf-btn--primary" disabled={busy || !name.trim()}>
-          {existing ? "保存修改" : "保存凭据"}
+          {existing ? t("保存修改") : t("保存凭据")}
         </button>
         <button type="button" className="nf-btn nf-btn--ghost" onClick={onCancel}>
-          取消
+          
+          {t("取消")}
         </button>
         {onDelete && (
           <button type="button" className="nf-btn nf-btn--ghost nf-cred__delete" onClick={onDelete}>
-            删除
+            
+            {t("删除")}
           </button>
         )}
       </div>

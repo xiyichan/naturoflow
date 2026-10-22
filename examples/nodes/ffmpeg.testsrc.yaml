@@ -19,3 +19,7 @@ executor:
   outputs:
     video: "{{ctx.outDir}}/testsrc.mp4"
 cache: true
+i18n:
+  en:
+    name: Test video
+    description: Generate a test video with ffmpeg's lavfi testsrc.

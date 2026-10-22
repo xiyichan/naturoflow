@@ -20,3 +20,6 @@ executor:
     gif: "{{ctx.outDir}}/out.gif"
 timeout: 10m
 cache: true
+i18n:
+  en:
+    name: Video to GIF

@@ -31,6 +31,7 @@ export interface NodeTypeSummary {
   outputs: Record<string, PortDef>;
   source?: string;
   readonly: boolean;
+  i18n?: Record<string, Record<string, unknown>>;
 }
 
 export interface CredentialField {
@@ -117,6 +118,7 @@ export interface ValidationIssue {
   message: string;
   nodeId?: string;
   path?: string;
+  args?: Record<string, string | number>;
 }
 
 export type RunStatus = "pending" | "running" | "success" | "failed" | "skipped" | "cancelled";
