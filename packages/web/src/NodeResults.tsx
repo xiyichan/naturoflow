@@ -16,8 +16,8 @@ export interface Media {
 }
 
 /**
- * Every distinct image/video in a result: local files, plus http(s) links whose path ends in a
- * media extension (e.g. Seedream / S3 links, which carry signature query strings).
+ * Every distinct image/video in a result: local files, or — when there are none — http(s) links
+ * whose path ends in a media extension (e.g. Seedream / S3 links, which carry signature queries).
  */
 export function mediaIn(v: unknown): Media[] {
   const out: Media[] = [];
@@ -37,7 +37,10 @@ export function mediaIn(v: unknown): Media[] {
     else if (x && typeof x === "object") Object.values(x).forEach(walk);
   };
   walk(v);
-  return out;
+  // A node that saved its images locally (e.g. Seedream) also outputs their links: show only the
+  // local copies then, so each image appears once. Links are shown only when nothing was saved.
+  const local = out.filter((m) => !m.remote);
+  return local.length ? local : out;
 }
 
 /** Local files (any type) in a result, for a text fallback. */
