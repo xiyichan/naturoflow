@@ -5,13 +5,50 @@ import { useStore } from "./store.ts";
 type FileRef = { $file: true; path: string; size: number; mime: string };
 const isFile = (v: unknown): v is FileRef => !!v && typeof v === "object" && (v as FileRef).$file === true;
 
-/** Every distinct file inside a result's outputs, in port order (`file` and `files[0]` are often the same). */
+const MEDIA_EXT = /\.(png|jpe?g|webp|gif|svg|bmp|avif|mp4|webm|mov)$/i;
+
+/** Something to show: a local file (served by the API) or a remote image/video URL. */
+export interface Media {
+  /** Local path, or the full http(s) URL for remote media. */
+  path: string;
+  mime: string;
+  remote?: boolean;
+}
+
+/**
+ * Every distinct image/video in a result: local files, plus http(s) links whose path ends in a
+ * media extension (e.g. Seedream / S3 links, which carry signature query strings).
+ */
+export function mediaIn(v: unknown): Media[] {
+  const out: Media[] = [];
+  const seen = new Set<string>();
+  const add = (m: Media) => !seen.has(m.path) && (seen.add(m.path), out.push(m));
+  const walk = (x: unknown) => {
+    if (isFile(x)) {
+      if (x.mime.startsWith("image/") || x.mime.startsWith("video/")) add({ path: x.path, mime: x.mime });
+    } else if (typeof x === "string" && /^https?:\/\//i.test(x)) {
+      try {
+        const ext = MEDIA_EXT.exec(new URL(x).pathname)?.[1]?.toLowerCase();
+        if (ext) add({ path: x, mime: /mp4|webm|mov/.test(ext) ? "video/mp4" : "image/*", remote: true });
+      } catch {
+        // not a URL
+      }
+    } else if (Array.isArray(x)) x.forEach(walk);
+    else if (x && typeof x === "object") Object.values(x).forEach(walk);
+  };
+  walk(v);
+  return out;
+}
+
+/** Local files (any type) in a result, for a text fallback. */
 function filesIn(v: unknown): FileRef[] {
   const all = (x: unknown): FileRef[] =>
     isFile(x) ? [x] : Array.isArray(x) ? x.flatMap(all) : x && typeof x === "object" ? Object.values(x).flatMap(all) : [];
   const seen = new Set<string>();
   return all(v).filter((f) => !seen.has(f.path) && seen.add(f.path));
 }
+
+export const mediaSrc = (m: Media) => (m.remote ? m.path : fileUrl(m.path));
 
 /** A short text for results without files (a number, a string, a small object). */
 function summary(outputs: Record<string, unknown>): string {
@@ -40,30 +77,42 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
   useEffect(() => setI(startAt()), [newest, pinnedRunId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cur = previews[Math.min(i, previews.length - 1)];
+  // Remote links that fail to load (expired, private) fall back to the text summary.
+  const [broken, setBroken] = useState<Set<string>>(new Set());
   if (!cur) return null;
   const files = filesIn(cur.outputs);
-  const images = files.filter((f) => f.mime.startsWith("image/") || f.mime.startsWith("video/"));
+  const images = mediaIn(cur.outputs).filter((m) => !broken.has(m.path));
   const isPinned = pinnedRunId === cur.runId;
 
-  const enlarge = (f: FileRef) => {
+  const enlarge = (m: Media) => {
     // All results' media in order, so ← → in the viewer walks through this node's history.
-    const all = previews.flatMap((p) => filesIn(p.outputs).filter((x) => x.mime.startsWith("image/") || x.mime.startsWith("video/")).map((x) => ({ x, p })));
+    const all = previews.flatMap((p) => mediaIn(p.outputs).filter((x) => !broken.has(x.path)).map((x) => ({ x, p })));
     openLightbox(
       all.map(({ x, p }) => ({ path: x.path, mime: x.mime, title: `${nodeId} 的结果${pinnedRunId === p.runId ? "（已选用）" : ""}`, sub: when(p.at) })),
-      Math.max(0, all.findIndex(({ x }) => x.path === f.path)),
+      Math.max(0, all.findIndex(({ x }) => x.path === m.path)),
     );
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const markBroken = (path: string) => setBroken((b) => new Set(b).add(path));
 
   return (
     <div className="nf-res nodrag nopan" data-pinned={isPinned || undefined} onClick={stop} onDoubleClick={stop}>
       {images.length ? (
         <div className="nf-res__media" data-count={Math.min(images.length, 4)}>
-          {images.slice(0, 4).map((f) =>
-            f.mime.startsWith("video/") ? (
-              <video key={f.path} src={fileUrl(f.path)} muted preload="metadata" onDoubleClick={() => enlarge(f)} title="双击放大" />
+          {images.slice(0, 4).map((m) =>
+            m.mime.startsWith("video/") ? (
+              <video key={m.path} src={mediaSrc(m)} muted preload="metadata" onDoubleClick={() => enlarge(m)} onError={() => markBroken(m.path)} title="双击放大" />
             ) : (
-              <img key={f.path} src={fileUrl(f.path)} alt="" draggable={false} onDoubleClick={() => enlarge(f)} title="双击放大" />
+              <img
+                key={m.path}
+                src={mediaSrc(m)}
+                alt=""
+                draggable={false}
+                referrerPolicy="no-referrer"
+                onDoubleClick={() => enlarge(m)}
+                onError={() => markBroken(m.path)}
+                title={m.remote ? "双击放大（网络图片）" : "双击放大"}
+              />
             ),
           )}
           {images.length > 4 && <span className="nf-res__more">+{images.length - 4}</span>}

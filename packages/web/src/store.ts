@@ -373,6 +373,23 @@ export const useStore = create<State>((set, get) => ({
       case "node.started":
       case "node.log":
       case "node.finished": {
+        // Show a node's new result on its card as soon as it finishes, not when the whole run does.
+        if (e.type === "node.finished" && e.node.status === "success" && e.node.outputs && e.node.cached !== "reuse" && e.node.cached !== "pin") {
+          const isOurs = (s.run?.id === e.runId && s.run.workflowId === wfId) || Object.values(s.singleRuns).some((r) => r.id === e.runId);
+          if (isOurs) {
+            const list = s.previews[e.node.nodeId] ?? [];
+            if (!list.some((p) => p.runId === e.runId)) {
+              const entry = {
+                runId: e.runId,
+                at: e.node.finishedAt ?? Date.now(),
+                ...(e.node.cached ? { cached: e.node.cached } : {}),
+                outputs: e.node.outputs,
+                ...(e.node.inactive?.length ? { inactive: e.node.inactive } : {}),
+              };
+              set({ previews: { ...get().previews, [e.node.nodeId]: [entry, ...list].slice(0, 20) } });
+            }
+          }
+        }
         const single = Object.values(s.singleRuns).find((r) => r.id === e.runId);
         const run = single ?? s.run;
         if (!run || run.id !== e.runId) return;

@@ -33,6 +33,7 @@ function Viewer({
   const [view, setView] = useState({ scale: 1, x: 0, y: 0, fit: true });
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
   const isImage = item.mime.startsWith("image/");
+  const [failed, setFailed] = useState(false);
 
   const fitScale = useCallback(() => {
     const el = stage.current;
@@ -104,7 +105,7 @@ function Viewer({
   };
   const onPointerUp = () => (drag.current = null);
 
-  const url = fileUrl(item.path);
+  const url = /^https?:\/\//i.test(item.path) ? item.path : fileUrl(item.path);
   const pct = Math.round(view.scale * 100);
 
   return (
@@ -125,7 +126,9 @@ function Viewer({
             src={url}
             alt={item.title ?? ""}
             draggable={false}
+            referrerPolicy="no-referrer"
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+            onError={() => setFailed(true)}
             style={{
               width: natural ? natural.w * view.scale : undefined,
               transform: `translate(${view.x}px, ${view.y}px)`,
@@ -140,6 +143,7 @@ function Viewer({
           <p className="nf-lb__nopreview">这种文件不能预览，点下面的「打开原文件」。</p>
         )}
 
+        {failed && <p className="nf-lb__nopreview">图片加载失败：链接可能已过期（Seedream 的链接 24 小时内有效）或没有访问权限。</p>}
         {count > 1 && (
           <>
             <button className="nf-lb__nav nf-lb__nav--prev" onClick={() => onStep(-1)} aria-label="上一张">
