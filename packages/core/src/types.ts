@@ -136,6 +136,8 @@ export const WorkflowNode = z.object({
   cache: z.boolean().optional(),
   /** Id of the saved credential this node uses (for node types that declare `credentials`). */
   credential: z.string().optional(),
+  /** Use the outputs this node produced in that earlier run instead of executing it. */
+  pin: z.object({ runId: z.string() }).optional(),
 });
 export type WorkflowNode = z.infer<typeof WorkflowNode>;
 
@@ -186,8 +188,8 @@ export interface NodeRunRecord {
   finishedAt?: number;
   /** Output ports that did not fire (e.g. the untaken side of core.if). */
   inactive?: string[];
-  /** Where the outputs came from when the node did not execute. */
-  cached?: "cache" | "reuse";
+  /** Where the outputs came from when the node did not execute ("pin": a result the user chose). */
+  cached?: "cache" | "reuse" | "pin";
   /** Human-readable explanation, e.g. why a node was skipped. */
   note?: string;
   /** Params as actually used (templates rendered, secrets masked). */

@@ -178,6 +178,8 @@ export interface RunOptions {
   useCache?: boolean;
   /** Outputs to reuse instead of executing, keyed by node id (rerun-from-node). */
   reuse?: Record<string, NodeRunRecord>;
+  /** Results the user chose for pinned nodes, keyed by node id; these nodes don't execute. */
+  pins?: Record<string, NodeRunRecord>;
   rerunOf?: RunRecord["rerunOf"];
   parentRunId?: string;
   /** Abort together with a parent run. */
@@ -366,6 +368,18 @@ export class Engine extends EventEmitter {
     const logOutputs = (outputs?: Record<string, unknown>) => {
       if (outputs && Object.keys(outputs).length) log(`outputs: ${preview(outputs)}`);
     };
+
+    // 0. A result the user pinned for this node.
+    const pinned = ro.single?.nodeId === node.id ? undefined : ro.pins?.[node.id];
+    if (pinned) {
+      if (pinned.status === "success" && filesIntact(pinned.outputs)) {
+        log(`using the chosen result from run ${pinned.runId}`);
+        logOutputs(pinned.outputs);
+        this.finishNode(run, node.id, "success", pinned.outputs, undefined, { inactive: pinned.inactive, cached: "pin" });
+        return;
+      }
+      log(`the chosen result from run ${pinned.runId} is no longer available (files deleted?); running the node instead`);
+    }
 
     // 1. Reuse outputs from an earlier run (rerun-from-node).
     const prev = ro.reuse?.[node.id];

@@ -1,6 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
-import { fileUrl, type NodeRun, type NodeTypeSummary, type WorkflowNode } from "./api.ts";
+import { fileUrl, type NodePreview, type NodeRun, type NodeTypeSummary, type WorkflowNode } from "./api.ts";
+import { NodeResults } from "./NodeResults.tsx";
 import { EXECUTOR_LABELS, typeColor, typeLabel } from "./ports.ts";
 import { guessMime } from "./mime.ts";
 import { useStore } from "./store.ts";
@@ -10,6 +11,7 @@ export type FlowNodeData = {
   type?: NodeTypeSummary;
   run?: NodeRun;
   issue?: string;
+  previews?: NodePreview[];
 };
 
 export type FlowNodeType = Node<FlowNodeData, "nf">;
@@ -30,7 +32,7 @@ function duration(run?: NodeRun) {
 }
 
 function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
-  const { node, type, run, issue } = data;
+  const { node, type, run, issue, previews } = data;
   const inputs = Object.entries(type?.inputs ?? {});
   const outputs = Object.entries(type?.outputs ?? {});
   const status = run?.status;
@@ -46,6 +48,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
     >
       <header className="nf-node__head">
         <span className="nf-node__title">{node.label || type?.name || node.type}</span>
+        {node.pin && <span className="nf-node__pinned" title="已选用一次历史结果，运行时不再执行这个节点">已选用</span>}
         <span className="nf-node__kind">{type ? EXECUTOR_LABELS[type.executor] ?? type.executor : "未知类型"}</span>
       </header>
       <div className="nf-node__sub">
@@ -53,7 +56,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
         {status && status !== "pending" && (
           <span className="nf-node__status">
             {status === "skipped" && run?.note ? "未走此分支" : STATUS_TEXT[status]}{" "}
-            {run?.cached ? (run.cached === "cache" ? "（缓存）" : "（沿用）") : duration(run)}
+            {run?.cached ? (run.cached === "cache" ? "（缓存）" : run.cached === "pin" ? "（已选用）" : "（沿用）") : duration(run)}
           </span>
         )}
       </div>
@@ -114,6 +117,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
           ))}
         </div>
       </div>
+      {previews && previews.length > 0 && <NodeResults nodeId={node.id} previews={previews} pinnedRunId={node.pin?.runId} />}
       {(issue || run?.error) && <p className="nf-node__error">{run?.error ?? issue}</p>}
     </div>
   );

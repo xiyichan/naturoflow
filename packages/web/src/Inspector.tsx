@@ -216,6 +216,7 @@ function RunDetail({ run, nodeId, single }: { run?: NodeRun; nodeId: string; sin
       </p>
       {run.cached === "cache" && <p className="nf-muted">输入和参数都没变，直接用了缓存的输出，没有重新执行。</p>}
       {run.cached === "reuse" && <p className="nf-muted">沿用了上一次运行的输出。</p>}
+      {run.cached === "pin" && <p className="nf-muted">使用的是你选用的那次结果，这次没有重新执行。</p>}
       {skippedBranch && <p className="nf-muted">上游的条件分支没有走到这里，所以没有执行。</p>}
       {run.inactive?.length ? <p className="nf-muted">没有触发的输出：{run.inactive.join("、")}</p> : null}
       {rerun}
@@ -443,6 +444,8 @@ function PublishSection() {
 /** Every past execution of this node, newest first, with what was sent and received. */
 function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
   const runNode = useStore((s) => s.runNode);
+  const pinResult = useStore((s) => s.pinResult);
+  const pinnedRunId = useStore((s) => s.workflow?.nodes.find((n) => n.id === nodeId)?.pin?.runId);
   const singleRunning = useStore((s) => s.singleRuns[nodeId]?.status === "running");
   const workflowId = useStore((s) => s.workflow!.id);
   // Refetch when a run of this workflow finishes.
@@ -507,6 +510,16 @@ function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
                   </details>
                 )}
                 <div className="nf-row">
+                  {n.status === "success" && (
+                    <button
+                      className="nf-btn"
+                      data-on={pinnedRunId === h.runId || undefined}
+                      title="运行时不再执行这个节点，下游直接用这次的结果"
+                      onClick={() => pinResult(nodeId, pinnedRunId === h.runId ? null : h.runId)}
+                    >
+                      {pinnedRunId === h.runId ? "已选用（点击取消）" : "选用这个结果"}
+                    </button>
+                  )}
                   <button
                     className="nf-btn"
                     disabled={singleRunning}

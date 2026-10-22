@@ -421,6 +421,47 @@ describe("assets", () => {
   });
 });
 
+describe("choosing a result", () => {
+  it("a pinned node reuses the chosen result; downstream and single runs follow it", async () => {
+    const a = path.join(home, "pin-a.txt");
+    const b = path.join(home, "pin-b.txt");
+    svc.saveWorkflow({
+      id: "pin",
+      name: "pin",
+      nodes: [
+        { id: "gen", type: "test.counter", params: { file: a }, cache: false },
+        { id: "use", type: "test.counter", params: { file: b }, cache: false },
+        js("show", "return inputs.input;"),
+      ],
+      edges: [edge("gen", "n", "use", "in"), edge("gen", "n", "show", "input")],
+    });
+    const r1 = await svc.runWorkflow("pin"); // gen -> 1
+    await svc.runWorkflow("pin"); // gen -> 2
+    expect(lines(a)).toBe(2);
+
+    // Pick the first result: gen doesn't execute, downstream gets 1.
+    svc.applyPatch("pin", [{ op: "update_node", id: "gen", pin: { runId: r1.id } }]);
+    const r3 = await svc.runWorkflow("pin");
+    expect(lines(a)).toBe(2);
+    expect(r3.nodes.gen).toMatchObject({ status: "success", cached: "pin", outputs: { n: 1 } });
+    expect(r3.nodes.show.outputs?.result).toBe(1);
+
+    // Running a downstream node alone uses the upstream's current (pinned) result.
+    expect((await svc.runSingleNode("pin", "show")).nodes.show.outputs?.result).toBe(1);
+
+    // Previews: newest first, pinned copies not repeated.
+    const prev = svc.nodePreviews("pin");
+    expect(prev.gen.map((p) => p.outputs.n)).toEqual([2, 1]);
+
+    // Un-pin: gen runs again, and single runs downstream pick up its latest result.
+    svc.applyPatch("pin", [{ op: "update_node", id: "gen", pin: null }]);
+    await svc.runSingleNode("pin", "gen"); // gen -> 3
+    expect((await svc.runSingleNode("pin", "show")).nodes.show.outputs?.result).toBe(3);
+
+    expect(() => svc.applyPatch("pin", [{ op: "update_node", id: "gen", pin: { runId: "nope" } }])).toThrow(/no successful result/);
+  });
+});
+
 describe("restarts", () => {
   it("marks runs left running by a stopped server as cancelled", () => {
     const stale = {

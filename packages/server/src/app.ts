@@ -159,6 +159,7 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     const run = await svc.runSingleNode(c.req.param("id"), c.req.param("nodeId"), { ...opts, wait: false });
     return c.json({ id: run.id, status: run.status }, 202);
   });
+  api.get("/workflows/:id/previews", (c) => c.json(svc.nodePreviews(c.req.param("id"), Number(c.req.query("limit") ?? 20))));
   api.get("/workflows/:id/nodes/:nodeId/history", (c) =>
     c.json(
       svc.nodeHistory(c.req.param("id"), c.req.param("nodeId"), {

@@ -631,3 +631,25 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 .nf-masonry .nf-gal__media img, .nf-masonry .nf-gal__media video,
 .nf-masonry .nf-assets__media img, .nf-masonry .nf-assets__media video { width: 100%; height: auto; display: block; object-fit: initial; }
 .nf-masonry .nf-gal__icon { display: grid; place-items: center; aspect-ratio: 4 / 3; }
+
+/* ---------- results on node cards ---------- */
+.nf-res { border-top: 1px solid var(--line); padding: 8px 10px 6px; cursor: default; }
+.nf-res[data-pinned] { background: color-mix(in srgb, var(--t-file) 7%, transparent); }
+.nf-res__media { display: grid; gap: 4px; grid-template-columns: 1fr; position: relative; }
+.nf-res__media[data-count="2"], .nf-res__media[data-count="3"], .nf-res__media[data-count="4"] { grid-template-columns: 1fr 1fr; }
+.nf-res__media img, .nf-res__media video {
+  width: 100%; max-height: 180px; object-fit: contain; border-radius: 4px; cursor: zoom-in; display: block;
+  background: repeating-conic-gradient(var(--panel-2) 0 25%, var(--node) 0 50%) 0 0 / 10px 10px;
+}
+.nf-res__media[data-count="1"] img, .nf-res__media[data-count="1"] video { max-height: 220px; }
+.nf-res__more { position: absolute; right: 4px; bottom: 4px; font: 600 11px var(--sans); background: rgba(0, 0, 0, 0.55); color: #fff; padding: 1px 5px; border-radius: 4px; }
+.nf-res__text { margin: 0; font: 11.5px/1.4 var(--mono); color: var(--ink-2); max-height: 4.2em; overflow: hidden; word-break: break-all; white-space: pre-wrap; }
+.nf-res__bar { display: flex; align-items: center; gap: 2px; margin-top: 6px; font-size: 11px; color: var(--ink-3); }
+.nf-res__bar > button { font: 600 13px/1 var(--sans); color: var(--ink-2); background: none; border: 0; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+.nf-res__bar > button:hover:not(:disabled) { background: var(--panel-2); }
+.nf-res__bar > button:disabled { opacity: 0.3; cursor: default; }
+.nf-res__pos { font-variant-numeric: tabular-nums; }
+.nf-res__bar > .nf-res__pin { font: 500 11.5px var(--sans); color: var(--act); border: 1px solid var(--line); padding: 2px 8px; }
+.nf-res__bar > .nf-res__pin[data-on] { color: var(--t-file); border-color: var(--t-file); }
+.nf-node__pinned { font-size: 10.5px; color: var(--t-file); border: 1px solid var(--t-file); border-radius: 4px; padding: 0 4px; }
+.nf-node { max-width: 300px; }

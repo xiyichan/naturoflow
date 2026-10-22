@@ -85,6 +85,8 @@ export const PatchOp = z.discriminatedUnion("op", [
     type: z.string().optional(),
     /** Saved credential id to use; null clears it. */
     credential: z.string().nullable().optional(),
+    /** Use this node's result from that run instead of executing it; null un-pins. */
+    pin: z.object({ runId: z.string() }).nullable().optional(),
   }),
   z.object({ op: z.literal("remove_node"), id: z.string() }),
   z.object({ op: z.literal("connect"), edge: WorkflowEdge }),
@@ -94,6 +96,16 @@ export const PatchOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_tool"), tool: ToolPublish.nullable() }),
 ]);
 export type PatchOp = z.input<typeof PatchOp>;
+
+/** One past result of a node, for canvas previews. */
+export interface NodePreview {
+  runId: string;
+  at: number;
+  single?: boolean;
+  cached?: string;
+  outputs: Record<string, unknown>;
+  inactive?: string[];
+}
 
 /** A file produced by a workflow run, with what produced it. */
 export interface Artifact {
@@ -331,6 +343,12 @@ export class NaturoflowService extends EventEmitter {
           if (op.label !== undefined) n.label = op.label;
           if (op.credential === null) delete n.credential;
           else if (op.credential !== undefined) n.credential = op.credential;
+          if (op.pin === null) delete n.pin;
+          else if (op.pin) {
+            const rec = this.store.getRun(op.pin.runId)?.nodes[n.id];
+            if (!rec || rec.status !== "success") throw new NfError("INVALID_ARGUMENT", `run "${op.pin.runId}" has no successful result for node "${n.id}"`, at);
+            n.pin = { runId: op.pin.runId };
+          }
           break;
         }
         case "remove_node":
@@ -572,21 +590,29 @@ export class NaturoflowService extends EventEmitter {
     }
     const source = sourceRun?.nodes[nodeId];
 
-    // Upstream File / Constant nodes are fixed values: read them directly, so a node that never
-    // ran (or whose file was swapped) still runs with what's on the canvas. Replaying a chosen
-    // history entry keeps that entry's inputs instead.
+    // Each input takes its upstream node's current result: File / Constant values as they are now,
+    // a pinned result, or that node's latest successful output. So after regenerating upstream,
+    // running this node alone uses the new result. Replaying a history entry keeps its inputs.
     const fixed: Record<string, unknown> = {};
     if (!opts.fromRunId) {
       for (const e of wf.edges.filter((e) => e.to.node === nodeId)) {
         const up = wf.nodes.find((n) => n.id === e.from.node);
+        if (!up) continue;
         try {
-          if (up?.type === "core.file" && typeof up.params.path === "string") {
+          if (up.type === "core.file" && typeof up.params.path === "string") {
             const p = up.params.path.startsWith("~/") ? path.join(os.homedir(), up.params.path.slice(2)) : up.params.path;
             fixed[e.to.port] = toFileRef(p);
-          } else if (up?.type === "core.const") fixed[e.to.port] = up.params.value;
+            continue;
+          }
+          if (up.type === "core.const") {
+            fixed[e.to.port] = up.params.value;
+            continue;
+          }
         } catch {
-          // A missing file: fall back to history / the missing-input error below.
+          continue; // a missing file: fall back to history / the missing-input error below
         }
+        const rec = up.pin ? this.store.getRun(up.pin.runId)?.nodes[up.id] : this.store.nodeHistory(workflowId, up.id, 5).find((h) => h.node.status === "success")?.node;
+        if (rec?.outputs && !rec.inactive?.includes(e.from.port) && rec.outputs[e.from.port] !== undefined) fixed[e.to.port] = rec.outputs[e.from.port];
       }
     }
     const inputs = opts.inputs ?? { ...(source?.inputs ?? {}), ...fixed };
@@ -617,7 +643,18 @@ export class NaturoflowService extends EventEmitter {
     );
   }
 
+  /** Pinned results of a workflow's nodes, for the engine. */
+  private pinsOf(wf: Workflow): Record<string, NodeRunRecord> {
+    const pins: Record<string, NodeRunRecord> = {};
+    for (const n of wf.nodes) {
+      const rec = n.pin ? this.store.getRun(n.pin.runId)?.nodes[n.id] : undefined;
+      if (rec) pins[n.id] = rec;
+    }
+    return pins;
+  }
+
   private start(wf: Workflow, inputs: Record<string, unknown>, ro: RunOptions, wait = true): Promise<RunRecord> {
+    ro = { ...ro, pins: { ...this.pinsOf(wf), ...ro.pins } };
     if (wait) return this.engine.run(wf, inputs, ro);
     return new Promise<RunRecord>((resolve, reject) => {
       this.engine.run(wf, inputs, { ...ro, onStart: resolve }).catch(reject);
@@ -659,6 +696,37 @@ export class NaturoflowService extends EventEmitter {
     const run = this.liveRuns.get(id) ?? this.store.getRun(id);
     if (!run) throw new NfError("RUN_NOT_FOUND", `run "${id}" not found`);
     return run;
+  }
+
+  /**
+   * Recent successful results of every node in a workflow, newest first (outputs only — no logs,
+   * traces or inputs), for previews on the canvas.
+   */
+  nodePreviews(workflowId: string, limit = 20): Record<string, NodePreview[]> {
+    const wf = this.getWorkflow(workflowId);
+    const out: Record<string, NodePreview[]> = {};
+    for (const n of wf.nodes) {
+      if (n.type === "core.const" || n.type === "core.file" || n.type === "core.input") continue;
+      const list = this.store
+        .nodeHistory(workflowId, n.id, limit * 2)
+        .filter((h) => h.node.status === "success" && h.node.cached !== "reuse" && h.node.cached !== "pin")
+        .slice(0, limit)
+        .map((h) => ({
+          runId: h.runId,
+          at: h.node.finishedAt ?? h.runStartedAt,
+          ...(h.single ? { single: true } : {}),
+          ...(h.node.cached ? { cached: h.node.cached } : {}),
+          outputs: h.node.outputs ?? {},
+          ...(h.node.inactive?.length ? { inactive: h.node.inactive } : {}),
+        }));
+      // A pinned result older than the window still shows up.
+      if (n.pin && !list.some((p) => p.runId === n.pin!.runId)) {
+        const rec = this.store.getRun(n.pin.runId)?.nodes[n.id];
+        if (rec?.outputs) list.push({ runId: n.pin.runId, at: rec.finishedAt ?? 0, outputs: rec.outputs });
+      }
+      if (list.length) out[n.id] = list;
+    }
+    return this.maskSecrets(out);
   }
 
   /** A node's past executions (params, request/response, outputs, logs), newest first. */

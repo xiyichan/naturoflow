@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible } from "./ports.ts";
 import {
+  type NodePreview,
   api,
   ApiError,
   type NodeRun,
@@ -47,6 +48,11 @@ interface State {
   stepLightbox(delta: number): void;
   view: "canvas" | "gallery";
   setView(v: "canvas" | "gallery"): void;
+  /** Recent results per node of the open workflow, for previews on node cards. */
+  previews: Record<string, NodePreview[]>;
+  loadPreviews(): Promise<void>;
+  /** Use this node's result from that run instead of executing it (null to stop). */
+  pinResult(nodeId: string, runId: string | null): Promise<void>;
   /** Bumped when a run of the open workflow finishes, so the gallery refetches. */
   artifactsVersion: number;
   /** Latest single-node run per node of the open workflow (kept apart from the canvas run). */
@@ -132,6 +138,18 @@ export const useStore = create<State>((set, get) => ({
     if (lb && lb.items.length > 1) set({ lightbox: { ...lb, index: (lb.index + delta + lb.items.length) % lb.items.length } });
   },
   artifactsVersion: 0,
+  previews: {},
+  async loadPreviews() {
+    const id = get().workflow?.id;
+    if (!id) return;
+    const previews = await api.previews(id).catch(() => ({}));
+    if (get().workflow?.id === id) set({ previews });
+  },
+  async pinResult(nodeId, runId) {
+    if (await get().patch([{ op: "update_node", id: nodeId, pin: runId ? { runId } : null }])) {
+      get().notify("info", runId ? `${nodeId} 已选用这次的结果，运行时不再重新执行它` : `${nodeId} 已取消选用，运行时会正常执行`);
+    }
+  },
   setView(view) {
     set({ view });
   },
@@ -165,7 +183,8 @@ export const useStore = create<State>((set, get) => ({
   async openWorkflow(id) {
     const [workflow, issues, runs] = await Promise.all([api.workflow(id), api.validate(id), api.runs(id)]);
     storage.set(LAST_WF, id);
-    set({ workflow, issues, runs, selected: null, run: null, singleRuns: {} });
+    set({ workflow, issues, runs, selected: null, run: null, singleRuns: {}, previews: {} });
+    get().loadPreviews();
     if (runs[0]) await get().showRun(runs[0].id);
   },
 
@@ -368,7 +387,10 @@ export const useStore = create<State>((set, get) => ({
         break;
       }
       case "run.finished":
-        if (e.run.workflowId === wfId) set({ artifactsVersion: get().artifactsVersion + 1 });
+        if (e.run.workflowId === wfId) {
+          set({ artifactsVersion: get().artifactsVersion + 1 });
+          get().loadPreviews();
+        }
         if (e.run.single) {
           if (e.run.workflowId === wfId) {
             set({ singleRuns: { ...s.singleRuns, [e.run.single.nodeId]: e.run } });

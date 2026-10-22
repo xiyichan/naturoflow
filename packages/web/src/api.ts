@@ -72,6 +72,17 @@ export interface WorkflowNode {
   position: { x: number; y: number };
   label?: string;
   credential?: string;
+  pin?: { runId: string };
+}
+
+/** One past result of a node, for previews on its card. */
+export interface NodePreview {
+  runId: string;
+  at: number;
+  single?: boolean;
+  cached?: string;
+  outputs: Record<string, unknown>;
+  inactive?: string[];
 }
 
 export interface Edge {
@@ -122,7 +133,7 @@ export interface NodeRun {
   startedAt?: number;
   finishedAt?: number;
   inactive?: string[];
-  cached?: "cache" | "reuse";
+  cached?: "cache" | "reuse" | "pin";
   note?: string;
   params?: Record<string, unknown>;
   trace?: { request?: Record<string, unknown>; response?: Record<string, unknown> };
@@ -194,6 +205,7 @@ export type PatchOp =
       position?: { x: number; y: number };
       label?: string;
       credential?: string | null;
+      pin?: { runId: string } | null;
     }
   | { op: "remove_node"; id: string }
   | { op: "connect"; edge: Edge }
@@ -265,6 +277,7 @@ export const api = {
     nodeId: string,
     opts: { fromRunId?: string; inputs?: Record<string, unknown>; params?: "current" | "history"; useCache?: boolean },
   ) => req<{ id: string; status: RunStatus }>("POST", `/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/run`, opts),
+  previews: (workflowId: string) => req<Record<string, NodePreview[]>>("GET", `/workflows/${encodeURIComponent(workflowId)}/previews?limit=20`),
   nodeHistory: (workflowId: string, nodeId: string, before?: number, limit = 20) =>
     req<NodeHistoryEntry[]>(
       "GET",

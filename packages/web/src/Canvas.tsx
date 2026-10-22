@@ -35,6 +35,7 @@ export function Canvas() {
   const run = useStore((s) => s.run);
   const issues = useStore((s) => s.issues);
   const selected = useStore((s) => s.selected);
+  const previews = useStore((s) => s.previews);
   const select = useStore((s) => s.select);
   const patch = useStore((s) => s.patch);
   const { screenToFlowPosition } = useReactFlow();
@@ -57,10 +58,11 @@ export function Canvas() {
           type: types[n.type],
           run: run?.workflowId === workflow.id ? run.nodes[n.id] : undefined,
           issue: issueByNode.get(n.id),
+          previews: previews[n.id],
         },
       }));
     });
-  }, [workflow, types, run, issues, selected, setNodes]);
+  }, [workflow, types, run, issues, selected, setNodes, previews]);
 
   // Edges are derived from the workflow; only their selection is local state.
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());

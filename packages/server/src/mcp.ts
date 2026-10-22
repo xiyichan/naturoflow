@@ -271,7 +271,8 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
     "update_node",
     {
       title: "Update node",
-      description: "Change a node's params (merged unless replaceParams), position, label, type or selected credential.",
+      description:
+        "Change a node's params (merged unless replaceParams), position, label, type, selected credential, or pin it to an earlier result (pin: {runId}) so runs reuse that result instead of executing it.",
       inputSchema: {
         workflowId,
         id: z.string(),
@@ -281,6 +282,11 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
         label: z.string().optional(),
         type: z.string().optional(),
         credential: z.string().nullable().optional().describe("saved credential id (see list_credentials); null clears it"),
+        pin: z
+          .object({ runId: z.string() })
+          .nullable()
+          .optional()
+          .describe("use this node's result from that run (see get_node_history) instead of executing it; null un-pins"),
         expectedVersion,
       },
     },
