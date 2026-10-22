@@ -8,18 +8,21 @@ import {
   useReactFlow,
   type Connection,
   type Edge as RFEdge,
+  type EdgeChange,
   type IsValidConnection,
   type OnDelete,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { api, type Edge, type PatchOp } from "./api.ts";
 import { DND_FILE, type DraggedFile } from "./Assets.tsx";
+import { CableEdge } from "./CableEdge.tsx";
 import { FlowNode, type FlowNodeType } from "./FlowNode.tsx";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible, typeColor } from "./ports.ts";
 import { useStore } from "./store.ts";
 
 const nodeTypes = { nf: FlowNode };
+const edgeTypes = { cable: CableEdge };
 export const DND_TYPE = "application/x-naturoflow-node-type";
 
 const edgeId = (e: Edge) => `${e.from.node}.${e.from.port}->${e.to.node}.${e.to.port}`;
@@ -59,6 +62,19 @@ export function Canvas() {
     });
   }, [workflow, types, run, issues, selected, setNodes]);
 
+  // Edges are derived from the workflow; only their selection is local state.
+  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    setSelectedEdges((cur) => {
+      const next = new Set(cur);
+      for (const c of changes) {
+        if (c.type === "select") c.selected ? next.add(c.id) : next.delete(c.id);
+        else if (c.type === "remove") next.delete(c.id);
+      }
+      return next;
+    });
+  }, []);
+
   const edges = useMemo<RFEdge[]>(() => {
     if (!workflow) return [];
     const byId = new Map(workflow.nodes.map((n) => [n.id, n]));
@@ -74,13 +90,15 @@ export function Canvas() {
         sourceHandle: e.from.port,
         target: e.to.node,
         targetHandle: e.to.port,
+        type: "cable",
+        selected: selectedEdges.has(edgeId(e)),
         animated: status === "running",
         className: dead ? "nf-cable nf-cable--dead" : "nf-cable",
         style: { stroke: typeColor(portType) },
         data: { edge: e },
       };
     });
-  }, [workflow, types, run]);
+  }, [workflow, types, run, selectedEdges]);
 
   const portType = useCallback(
     (nodeId: string, port: string, dir: "inputs" | "outputs") => {
@@ -103,6 +121,32 @@ export function Canvas() {
   const onConnect = useCallback(
     (c: Connection) => {
       patch([{ op: "connect", edge: { from: { node: c.source, port: c.sourceHandle! }, to: { node: c.target, port: c.targetHandle! } } }]);
+    },
+    [patch],
+  );
+
+  // Dragging a cable's end: drop on another input to rewire, or on empty canvas to disconnect.
+  const reconnected = useRef(false);
+  const onReconnectStart = useCallback(() => {
+    reconnected.current = false;
+  }, []);
+  const onReconnect = useCallback(
+    (old: RFEdge, c: Connection) => {
+      reconnected.current = true;
+      const prev = (old.data as { edge: Edge }).edge;
+      const next: Edge = { from: { node: c.source, port: c.sourceHandle! }, to: { node: c.target, port: c.targetHandle! } };
+      if (edgeId(prev) === edgeId(next)) return;
+      patch([
+        { op: "disconnect", edge: prev },
+        { op: "connect", edge: next },
+      ]);
+    },
+    [patch],
+  );
+  const onReconnectEnd = useCallback(
+    (_: MouseEvent | TouchEvent, old: RFEdge) => {
+      if (!reconnected.current) patch([{ op: "disconnect", edge: (old.data as { edge: Edge }).edge }]);
+      reconnected.current = false;
     },
     [patch],
   );
@@ -174,7 +218,12 @@ export function Canvas() {
       edges={edges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      edgeTypes={edgeTypes}
       onConnect={onConnect}
+      onReconnectStart={onReconnectStart}
+      onReconnect={onReconnect}
+      onReconnectEnd={onReconnectEnd}
       isValidConnection={isValidConnection}
       onDelete={onDelete}
       onNodeDragStop={(_, __, dragged) =>
