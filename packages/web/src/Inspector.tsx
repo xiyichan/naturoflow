@@ -254,10 +254,11 @@ function Values({ title, values }: { title: string; values: Record<string, unkno
 function FilePreview({ f }: { f: FileRef }) {
   const url = fileUrl(f.path);
   const size = f.size > 1e6 ? `${(f.size / 1e6).toFixed(1)} MB` : `${(f.size / 1e3).toFixed(1)} KB`;
+  const open = () => useStore.getState().openLightbox([{ path: f.path, mime: f.mime, sub: f.path }]);
   return (
     <figure className="nf-file">
-      {f.mime.startsWith("image/") && <img src={url} alt={f.path} />}
-      {f.mime.startsWith("video/") && <video src={url} controls muted loop />}
+      {f.mime.startsWith("image/") && <img src={url} alt={f.path} title="双击放大" onDoubleClick={open} />}
+      {f.mime.startsWith("video/") && <video src={url} controls muted loop onDoubleClick={open} />}
       {f.mime.startsWith("audio/") && <audio src={url} controls />}
       <figcaption>
         <a href={url} target="_blank" rel="noreferrer">

@@ -49,6 +49,7 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
   const [dropping, setDropping] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const [uploadsVersion, setUploadsVersion] = useState(0);
+  const openLightbox = useStore((s) => s.openLightbox);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +135,7 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
             }}
           />
         </div>
-        <p className="nf-pal__hint nf-assets__hint">拖到画布上使用；拖到节点上会自动接到它的文件输入。也可以把电脑里的文件拖进来。</p>
+        <p className="nf-pal__hint nf-assets__hint">拖到画布上使用，拖到节点上会自动接到它的文件输入；点 ＋ 直接添加，双击放大查看。也可以把电脑里的文件拖进来。</p>
       </div>
 
       {items && items.length === 0 ? (
@@ -149,13 +150,18 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
                 className="nf-assets__item"
                 draggable
                 tabIndex={0}
-                title={`${it.sub ?? it.caption}\n${it.path}\n双击添加到画布`}
+                title={`${it.sub ?? it.caption}\n${it.path}\n拖到画布使用，双击放大`}
                 onDragStart={(e) => {
                   const payload: DraggedFile = { path: it.path, mime: it.mime, name: label(it) };
                   e.dataTransfer.setData(DND_FILE, JSON.stringify(payload));
                   e.dataTransfer.effectAllowed = "copy";
                 }}
-                onDoubleClick={() => onAdd([{ path: it.path, mime: it.mime, name: label(it) }])}
+                onDoubleClick={() =>
+                  openLightbox(
+                    items.map((x) => ({ path: x.path, mime: x.mime, title: x.sub, sub: x.caption })),
+                    items.indexOf(it),
+                  )
+                }
                 onKeyDown={(e) => e.key === "Enter" && onAdd([{ path: it.path, mime: it.mime, name: label(it) }])}
               >
                 <span className="nf-assets__media">
@@ -167,6 +173,18 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
                     <span className="nf-gal__icon">{it.name.split(".").pop()?.toUpperCase()}</span>
                   )}
                   {it.starred && <i className="nf-assets__star">★</i>}
+                  <button
+                    className="nf-assets__add"
+                    title="添加到画布"
+                    aria-label="添加到画布"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAdd([{ path: it.path, mime: it.mime, name: label(it) }]);
+                    }}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                  >
+                    ＋
+                  </button>
                 </span>
                 <span className="nf-assets__cap">{it.sub || it.caption}</span>
               </div>

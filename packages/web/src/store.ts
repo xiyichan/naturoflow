@@ -15,6 +15,14 @@ import {
   type WorkflowSummary,
 } from "./api.ts";
 
+export interface LightboxItem {
+  path: string;
+  mime: string;
+  /** Shown under the image, e.g. the prompt. */
+  title?: string;
+  sub?: string;
+}
+
 export type EditorTarget = { mode: "new" } | { mode: "edit"; id: string } | null;
 
 interface State {
@@ -33,6 +41,10 @@ interface State {
   logOpen: boolean;
   /** Bumped whenever saved credentials change, so pickers refetch. */
   credVersion: number;
+  lightbox: { items: LightboxItem[]; index: number } | null;
+  openLightbox(items: LightboxItem[], index?: number): void;
+  closeLightbox(): void;
+  stepLightbox(delta: number): void;
   view: "canvas" | "gallery";
   setView(v: "canvas" | "gallery"): void;
   /** Bumped when a run of the open workflow finishes, so the gallery refetches. */
@@ -108,6 +120,17 @@ export const useStore = create<State>((set, get) => ({
   credVersion: 0,
   singleRuns: {},
   view: "canvas",
+  lightbox: null,
+  openLightbox(items, index = 0) {
+    if (items.length) set({ lightbox: { items, index: Math.max(0, Math.min(index, items.length - 1)) } });
+  },
+  closeLightbox() {
+    set({ lightbox: null });
+  },
+  stepLightbox(delta) {
+    const lb = get().lightbox;
+    if (lb && lb.items.length > 1) set({ lightbox: { ...lb, index: (lb.index + delta + lb.items.length) % lb.items.length } });
+  },
   artifactsVersion: 0,
   setView(view) {
     set({ view });

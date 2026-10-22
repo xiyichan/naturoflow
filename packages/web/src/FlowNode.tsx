@@ -2,6 +2,8 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import { fileUrl, type NodeRun, type NodeTypeSummary, type WorkflowNode } from "./api.ts";
 import { EXECUTOR_LABELS, typeColor, typeLabel } from "./ports.ts";
+import { guessMime } from "./mime.ts";
+import { useStore } from "./store.ts";
 
 export type FlowNodeData = {
   node: WorkflowNode;
@@ -59,7 +61,18 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNodeType>) {
       {node.type === "core.file" && typeof node.params.path === "string" && (
         <div className="nf-node__file" title={node.params.path}>
           {/\.(png|jpe?g|webp|gif|svg)$/i.test(node.params.path) ? (
-            <img src={fileUrl(node.params.path)} alt="" draggable={false} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+            <img
+              src={fileUrl(node.params.path)}
+              alt=""
+              draggable={false}
+              title="双击放大"
+              onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                const p = node.params.path as string;
+                useStore.getState().openLightbox([{ path: p, mime: guessMime(p), title: node.label, sub: p }]);
+              }}
+            />
           ) : null}
           <span>{node.params.path.split("/").pop()}</span>
         </div>

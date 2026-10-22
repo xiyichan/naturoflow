@@ -30,6 +30,10 @@ function headline(a: Artifact) {
   return "";
 }
 
+function toLightbox(a: Artifact) {
+  return { path: a.path, mime: a.mime, title: headline(a) || undefined, sub: `${a.nodeLabel || a.nodeId}，${new Date(a.createdAt).toLocaleString()}${a.note ? `，${a.note}` : ""}` };
+}
+
 /** Own params plus upstream params as "node.param", for comparing whole chains. */
 function allParams(a: Artifact): Record<string, unknown> {
   const out: Record<string, unknown> = { ...(a.params ?? {}) };
@@ -57,6 +61,7 @@ export function Gallery() {
   const [selected, setSelected] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
+  const openLightbox = useStore((s) => s.openLightbox);
 
   const query = useMemo(() => ({ nodeId: nodeId || undefined, mime: KINDS[kind].mime, starred: starredOnly }), [nodeId, kind, starredOnly]);
 
@@ -133,7 +138,12 @@ export function Gallery() {
           <ul className="nf-gal__grid">
             {items?.map((a) => (
               <li key={a.path} data-selected={a.path === selected || undefined} data-picked={picked.includes(a.path) || undefined}>
-                <button className="nf-gal__card" onClick={() => setSelected(a.path)} title={headline(a) || a.path}>
+                <button
+                  className="nf-gal__card"
+                  onClick={() => setSelected(a.path)}
+                  onDoubleClick={() => openLightbox(items.map(toLightbox), items.indexOf(a))}
+                  title={`${headline(a) || a.path}\n双击放大`}
+                >
                   <span className="nf-gal__media">
                     <Thumb a={a} />
                   </span>
@@ -187,7 +197,7 @@ function Detail({ a, onMark }: { a: Artifact; onMark: (m: Partial<Pick<Artifact,
 
   return (
     <>
-      <div className="nf-gal__big">
+      <div className="nf-gal__big" title="双击放大" onDoubleClick={() => useStore.getState().openLightbox([toLightbox(a)])}>
         <Thumb a={a} big />
       </div>
       <div className="nf-insp__body">
@@ -319,7 +329,7 @@ function Compare({ items, onClose, onMark }: { items: Artifact[]; onClose: () =>
       <div className="nf-cmp__cols" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((a) => (
           <section key={a.path} className="nf-cmp__col">
-            <div className="nf-cmp__media">
+            <div className="nf-cmp__media" title="双击放大" onDoubleClick={() => useStore.getState().openLightbox(items.map(toLightbox), items.indexOf(a))}>
               <Thumb a={a} big />
             </div>
             <div className="nf-cmp__info">
