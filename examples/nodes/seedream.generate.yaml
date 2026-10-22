@@ -4,7 +4,8 @@ category: ai
 description: >-
   BytePlus ModelArk Seedream 图片生成，主要面向 Seedream 5.0：文生图、图生图、多图融合、
   交互编辑（在提示词里用 <bbox>x1 y1 x2 y2</bbox> 标区域）、图层拆分、透明背景。
-  参考图可以填 URL，或从 image 端口传入本地文件（自动转 base64）。生成的图片会下载到本地，
+  参考图从 image（图1）、image_2（图2）… 端口传入本地文件（自动转 base64）或 URL，也可以在参数里填 URL。
+  生成的图片会下载到本地，
   file / files 输出可以直接预览或交给下游。只发送设置过的参数。
 credentials:
   type: byteplus-ark
@@ -22,7 +23,19 @@ inputs:
   image:
     type: any
     required: false
-    description: 参考图：URL、data:image/...;base64、上游的文件，或它们的列表。和参数里的参考图合并发送
+    description: 图1。本地文件（自动转 base64）、URL（例如 S3 上传的输出）或它们的列表
+  image_2:
+    type: any
+    required: false
+    description: 图2。多图融合时在提示词里用「图1」「图2」指代，顺序按端口排列
+  image_3:
+    type: any
+    required: false
+    description: 图3
+  image_4:
+    type: any
+    required: false
+    description: 图4
 params:
   type: object
   required: [model]
@@ -40,7 +53,7 @@ params:
     image:
       type: string
       format: multiline
-      description: 参考图 URL 或本地文件路径，每行一张。5.0 pro / flash 最多 10 张，5.0 lite / 4.5 / 4.0 最多 14 张
+      description: 额外的参考图 URL 或本地文件路径，每行一张，排在端口传入的图之后。5.0 pro / flash 最多 10 张，5.0 lite / 4.5 / 4.0 最多 14 张
     layer_decomposition:
       type: boolean
       description: 图层拆分：把一张图拆成底图 + 最多 16 个透明图层（PNG）。需要且只能有一张参考图。仅 5.0 pro / flash

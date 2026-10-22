@@ -250,6 +250,28 @@ describe("single-node runs", () => {
     expect(lines(b)).toBe(4);
   });
 
+  it("reads upstream File / Constant nodes directly when running one node", async () => {
+    const f = path.join(home, "single-in.png");
+    fs.writeFileSync(f, "abc");
+    svc.saveWorkflow({
+      id: "fixed",
+      name: "fixed",
+      nodes: [
+        { id: "pic", type: "core.file", params: { path: f } },
+        { id: "n", type: "core.const", params: { value: 41 } },
+        js("size", "return inputs.input.size;"),
+        js("plus", "return inputs.input + 1;"),
+      ],
+      edges: [edge("pic", "file", "size", "input"), edge("n", "value", "plus", "input")],
+    });
+    // Never ran before, yet both work on their own.
+    expect((await svc.runSingleNode("fixed", "size")).nodes.size.outputs?.result).toBe(3);
+    expect((await svc.runSingleNode("fixed", "plus")).nodes.plus.outputs?.result).toBe(42);
+    // Swapping the constant is picked up on the next single run.
+    svc.applyPatch("fixed", [{ op: "update_node", id: "n", params: { value: 9 } }]);
+    expect((await svc.runSingleNode("fixed", "plus")).nodes.plus.outputs?.result).toBe(10);
+  });
+
   it("refuses when a required input has never had a value", async () => {
     svc.saveWorkflow({ id: "fresh", name: "fresh", nodes: [{ id: "gif", type: "ffmpeg.to-gif" }] });
     await expect(svc.runSingleNode("fresh", "gif")).rejects.toThrow(/no value for input "video"/);
@@ -388,6 +410,28 @@ describe("assets", () => {
     const all = svc.listAllArtifacts();
     expect(new Set(all.map((a) => a.path)).size).toBe(all.length);
     expect(all.length).toBeGreaterThan(0);
+  });
+});
+
+describe("restarts", () => {
+  it("marks runs left running by a stopped server as cancelled", () => {
+    const stale = {
+      id: "stale-run",
+      workflowId: "single",
+      status: "running" as const,
+      inputs: {},
+      startedAt: Date.now() - 1000,
+      nodes: {
+        a: { runId: "stale-run", nodeId: "a", status: "success" as const, logs: [], attempts: 1 },
+        b: { runId: "stale-run", nodeId: "b", status: "running" as const, logs: [], attempts: 1 },
+      },
+    };
+    svc.store.saveRun(stale);
+    expect(svc.store.cancelInterruptedRuns("interrupted")).toBeGreaterThanOrEqual(1);
+    const run = svc.getRun("stale-run");
+    expect(run.status).toBe("cancelled");
+    expect(run.nodes.a.status).toBe("success");
+    expect(run.nodes.b).toMatchObject({ status: "cancelled", error: "interrupted" });
   });
 });
 

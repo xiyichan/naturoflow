@@ -49,7 +49,10 @@ export default async ({ inputs, params, ctx }) => {
   if (!apiKey) throw new Error("no API key: select or create a BytePlus ModelArk credential on this node");
   const base = (ctx.credential.base_url || DEFAULT_BASE_URL).replace(/\/+$/, "");
 
-  const images = [...collectImages(inputs.image), ...collectImages(params.image)].map(toApiImage);
+  // Order matters ("图1", "图2" in prompts): ports image, image_2, image_3, image_4, then param lines.
+  const images = [inputs.image, inputs.image_2, inputs.image_3, inputs.image_4, params.image]
+    .flatMap(collectImages)
+    .map(toApiImage);
 
   // Build the body from set values only.
   const body = { model: params.model };

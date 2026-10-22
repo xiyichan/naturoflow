@@ -1,0 +1,95 @@
+id: s3.upload
+name: S3 上传
+category: network
+description: >-
+  把文件上传到 S3 或兼容 S3 的对象存储（可当图床），返回公开链接和预签名下载链接。
+  支持一个文件或一组文件（比如 Seedream 的 files 输出）。签名用 SigV4，默认 path-style 地址。
+credentials:
+  type: s3
+  name: S3 存储
+  fields:
+    access_key_id:
+      label: Access Key ID
+      secret: false
+    secret_access_key:
+      label: Secret Access Key
+    endpoint:
+      label: Endpoint
+      secret: false
+      description: 对象存储的地址，例如 https://s3.amazonaws.com 或第三方的 https://us1-dcs-s3.bifrostcloud.com
+    region:
+      label: 区域
+      secret: false
+      required: false
+      description: 签名用的区域，不填为 us-east-1（多数第三方存储接受这个值）
+    bucket:
+      label: 默认 bucket
+      secret: false
+      required: false
+    public_base_url:
+      label: 公开访问地址
+      secret: false
+      required: false
+      description: 可选。图床用的 CDN / 自定义域名，填了以后返回的 url 用它拼接 key；不填就用 Endpoint/bucket/key
+    addressing:
+      label: 地址风格
+      secret: false
+      required: false
+      description: 默认 path-style（Endpoint/bucket/key）；填 virtual-hosted 则用 bucket.Endpoint/key
+inputs:
+  file:
+    type: any
+    description: 要上传的文件，或文件列表
+params:
+  type: object
+  properties:
+    bucket:
+      type: string
+      description: 不填用凭据里的默认 bucket
+    key:
+      type: string
+      default: "naturoflow/{date}/{name}-{uuid}.{ext}"
+      description: 对象 key 模板，可用 {date} {time} {uuid} {name} {ext} {filename} {index}。多个文件时要包含 {name}、{uuid} 或 {index}，否则会互相覆盖
+    acl:
+      type: string
+      enum: [private, public-read]
+      description: 不填则用存储桶的默认权限。要直接公开访问可选 public-read（存储需要允许 ACL）
+    content_type:
+      type: string
+      description: 不填按文件类型自动判断
+    cache_control:
+      type: string
+      description: 例如 public, max-age=31536000
+    presign:
+      type: boolean
+      default: true
+      description: 同时生成预签名下载链接（bucket 不公开时也能访问）
+    presign_expires:
+      type: integer
+      default: 604800
+      minimum: 1
+      maximum: 604800
+      description: 预签名链接有效期（秒），最长 7 天
+outputs:
+  url:
+    type: string
+    description: 第一个文件的公开链接
+  urls:
+    type: list<string>
+  presigned_url:
+    type: string
+    required: false
+    description: 第一个文件的预签名下载链接
+  presigned_urls:
+    type: list<string>
+  keys:
+    type: list<string>
+  uploads:
+    type: json
+    description: 每个文件的 bucket、key、url、presigned_url、etag、大小
+executor:
+  kind: script
+  language: js
+  file: s3.upload.mjs
+timeout: 30m
+retry: { max: 1, backoff: 3s }

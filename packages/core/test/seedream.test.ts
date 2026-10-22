@@ -114,6 +114,28 @@ describe("seedream.generate", () => {
     expect(run.nodes.gen.trace?.request).toMatchObject({ body: { image: [expect.stringMatching(/^data:image\/png;base64,.*chars\)$/), "https://x/1.png", "https://x/2.png"] } });
   });
 
+  it("numbered image ports keep their order (图1, 图2) and accept S3 URLs", async () => {
+    requests = [];
+    reply = () => ({ status: 200, json: { data: [img("c.png")] } });
+    const local = path.join(home, "hoodie.png");
+    fs.writeFileSync(local, PNG);
+    const run = await svc.runWorkflow({
+      id: "multi",
+      name: "multi",
+      nodes: [
+        { id: "hoodie", type: "core.file", params: { path: local } },
+        { id: "design", type: "core.const", params: { value: "https://cdn.example.com/cat.png" } },
+        { id: "gen", type: "seedream.generate", credential: credId, params: { prompt: "把图2印到图1的卫衣胸前" } },
+      ],
+      edges: [
+        { from: { node: "design", port: "value" }, to: { node: "gen", port: "image_2" } },
+        { from: { node: "hoodie", port: "file" }, to: { node: "gen", port: "image" } },
+      ],
+    });
+    expect(run.status).toBe("success");
+    expect(requests[0].body.image).toEqual([`data:image/png;base64,${PNG.toString("base64")}`, "https://cdn.example.com/cat.png"]);
+  });
+
   it("layer decomposition downloads the base image and every layer", async () => {
     requests = [];
     reply = () => ({

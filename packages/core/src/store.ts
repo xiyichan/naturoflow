@@ -38,6 +38,28 @@ export class Store {
       .all() as never;
   }
 
+  /**
+   * Runs still marked running/pending belong to a previous server process that stopped mid-run:
+   * mark them (and their unfinished nodes) cancelled so they don't show as running forever.
+   */
+  cancelInterruptedRuns(reason: string): number {
+    const rows = this.db.prepare("SELECT json FROM runs WHERE status IN ('running', 'pending')").all() as { json: string }[];
+    for (const row of rows) {
+      const run = JSON.parse(row.json) as RunRecord;
+      run.status = "cancelled";
+      run.error = reason;
+      run.finishedAt ??= Date.now();
+      for (const n of Object.values(run.nodes)) {
+        if (n.status === "running" || n.status === "pending") {
+          n.status = "cancelled";
+          n.error = reason;
+        }
+      }
+      this.saveRun(run);
+    }
+    return rows.length;
+  }
+
   allWorkflows(): Workflow[] {
     return (this.db.prepare("SELECT json FROM workflows").all() as { json: string }[]).map((r) => JSON.parse(r.json));
   }

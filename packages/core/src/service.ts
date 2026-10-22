@@ -161,6 +161,7 @@ export class NaturoflowService extends EventEmitter {
     if (config.watch !== false) this.watchNodeDirs([...config.nodeDirs, userNodes]);
     this.store = new Store(path.join(config.home, "naturoflow.db"));
     this.secrets = new SecretBox(config.home);
+    this.store.cancelInterruptedRuns("interrupted: the server stopped while this was running");
     this.engine = new Engine(this.registry, {
       runsDir: path.join(config.home, "runs"),
       allowedBins: config.allowedBins,
@@ -571,7 +572,24 @@ export class NaturoflowService extends EventEmitter {
     }
     const source = sourceRun?.nodes[nodeId];
 
-    const inputs = opts.inputs ?? source?.inputs ?? {};
+    // Upstream File / Constant nodes are fixed values: read them directly, so a node that never
+    // ran (or whose file was swapped) still runs with what's on the canvas. Replaying a chosen
+    // history entry keeps that entry's inputs instead.
+    const fixed: Record<string, unknown> = {};
+    if (!opts.fromRunId) {
+      for (const e of wf.edges.filter((e) => e.to.node === nodeId)) {
+        const up = wf.nodes.find((n) => n.id === e.from.node);
+        try {
+          if (up?.type === "core.file" && typeof up.params.path === "string") {
+            const p = up.params.path.startsWith("~/") ? path.join(os.homedir(), up.params.path.slice(2)) : up.params.path;
+            fixed[e.to.port] = toFileRef(p);
+          } else if (up?.type === "core.const") fixed[e.to.port] = up.params.value;
+        } catch {
+          // A missing file: fall back to history / the missing-input error below.
+        }
+      }
+    }
+    const inputs = opts.inputs ?? { ...(source?.inputs ?? {}), ...fixed };
     const missing = Object.entries(def.inputs).filter(([k, p]) => p.required && inputs[k] === undefined).map(([k]) => k);
     if (missing.length) {
       throw new NfError(
