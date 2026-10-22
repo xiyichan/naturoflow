@@ -325,4 +325,6 @@ export const en: Record<string, string> = {
   "请选择 {0} 凭据": "Choose a {0} credential",
   "选择的凭据已被删除，请重新选择": "The chosen credential was deleted — choose another",
   "凭据“{0}”的类型是 {1}，这里需要 {2}": "Credential “{0}” is a {1} credential; this node needs {2}",
+  "已粘贴 {0} 个节点": "Pasted {0} node(s)",
+  "已复制 {0} 个节点": "Copied {0} node(s)",
 };

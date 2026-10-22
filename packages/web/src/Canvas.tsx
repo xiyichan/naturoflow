@@ -11,11 +11,14 @@ import {
   type EdgeChange,
   type IsValidConnection,
   type OnDelete,
+  type OnSelectionChangeFunc,
+  SelectionMode,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { api, type Edge, type PatchOp } from "./api.ts";
 import { DND_FILE, type DraggedFile } from "./Assets.tsx";
 import { CableEdge } from "./CableEdge.tsx";
+import { copyText, parseClip, pasteOps } from "./clipboard.ts";
 import { FlowNode, type FlowNodeType } from "./FlowNode.tsx";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible, typeColor } from "./ports.ts";
@@ -39,9 +42,12 @@ export function Canvas() {
   const previews = useStore((s) => s.previews);
   const select = useStore((s) => s.select);
   const patch = useStore((s) => s.patch);
-  const { screenToFlowPosition } = useReactFlow();
+  const notify = useStore((s) => s.notify);
+  const { screenToFlowPosition, getViewport } = useReactFlow();
 
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNodeType>([]);
+  // Edges are derived from the workflow; only their selection is local state.
+  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
 
   // Server state -> React Flow nodes. Positions come from the server except while dragging.
   useEffect(() => {
@@ -49,11 +55,14 @@ export function Canvas() {
     const issueByNode = new Map(issues.filter((i) => i.nodeId).map((i) => [i.nodeId!, issueText(i)]));
     setNodes((prev) => {
       const dragging = new Map(prev.filter((n) => n.dragging).map((n) => [n.id, n.position]));
+      // Selection is canvas state: keep it across server updates so multi-selections survive.
+      const picked = new Set(prev.filter((n) => n.selected).map((n) => n.id));
+      if (selected) picked.add(selected);
       return workflow.nodes.map((n) => ({
         id: n.id,
         type: "nf",
         position: dragging.get(n.id) ?? n.position,
-        selected: n.id === selected,
+        selected: picked.has(n.id),
         data: {
           node: n,
           type: types[n.type],
@@ -63,10 +72,112 @@ export function Canvas() {
         },
       }));
     });
-  }, [workflow, types, run, issues, selected, setNodes, previews]);
+  }, [workflow, types, run, issues, setNodes, previews]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Edges are derived from the workflow; only their selection is local state.
-  const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
+  // Selecting a node elsewhere (run log chips, newly added nodes) selects just that node,
+  // unless it is already part of the canvas selection.
+  useEffect(() => {
+    if (!selected) return;
+    setNodes((prev) => (prev.find((n) => n.id === selected)?.selected ? prev : prev.map((n) => ({ ...n, selected: n.id === selected }))));
+  }, [selected, setNodes]);
+
+  // The inspector shows the node when exactly one is selected, the workflow otherwise.
+  const onSelectionChange: OnSelectionChangeFunc = useCallback(
+    ({ nodes: sel }) => {
+      const want = sel.length === 1 ? sel[0].id : null;
+      if (useStore.getState().selected !== want) select(want);
+    },
+    [select],
+  );
+
+  const selectedIds = useCallback(() => new Set(nodes.filter((n) => n.selected).map((n) => n.id)), [nodes]);
+
+  const pasteClip = useCallback(
+    async (text: string | null | undefined, at?: { x: number; y: number }) => {
+      const clip = parseClip(text);
+      if (!workflow || !clip?.nodes.length) return false;
+      // Default spot: a little below-right of the originals, or the middle of the view.
+      const minX = Math.min(...clip.nodes.map((n) => n.position.x));
+      const minY = Math.min(...clip.nodes.map((n) => n.position.y));
+      const fromSameFlow = clip.nodes.some((n) => workflow.nodes.some((w) => w.id === n.id));
+      const vp = getViewport();
+      const pane = document.querySelector(".react-flow")?.getBoundingClientRect();
+      const center = pane ? { x: (pane.width / 2 - vp.x) / vp.zoom, y: (pane.height / 2 - vp.y) / vp.zoom } : { x: minX, y: minY };
+      const { ops, ids } = pasteOps(workflow, clip, at ?? (fromSameFlow ? { x: minX + 40, y: minY + 40 } : center));
+      if (!(await patch(ops))) return false;
+      const fresh = new Set(ids);
+      setNodes((prev) => prev.map((n) => ({ ...n, selected: fresh.has(n.id) })));
+      setSelectedEdges(new Set());
+      select(ids.length === 1 ? ids[0] : null);
+      notify("info", t("已粘贴 {0} 个节点", [ids.length]));
+      return true;
+    },
+    [workflow, patch, setNodes, select, getViewport], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Keyboard: select all, copy / cut / paste, duplicate. Ignored while typing in a field.
+  // Copies go to the system clipboard (so they paste into another workflow or tab) and are
+  // also kept here, in case the browser doesn't hand the clipboard back on paste.
+  const lastCopy = useRef<string | null>(null);
+  useEffect(() => {
+    const typing = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || !!el.closest("dialog"));
+    const hasTextSelection = () => (window.getSelection()?.toString() ?? "") !== "";
+    let pasteHandled = false;
+
+    const copy = (cut: boolean) => {
+      if (!workflow) return false;
+      const ids = selectedIds();
+      const text = copyText(workflow, ids);
+      if (!text) return false;
+      lastCopy.current = text;
+      navigator.clipboard?.writeText(text).catch(() => {});
+      if (cut) {
+        patch([...ids].map((id) => ({ op: "remove_node" as const, id })));
+        select(null);
+      } else notify("info", t("已复制 {0} 个节点", [ids.size]));
+      return true;
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (!workflow || typing(e.target) || !(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === "a") {
+        e.preventDefault();
+        setNodes((prev) => prev.map((n) => ({ ...n, selected: true })));
+        setSelectedEdges(new Set());
+        select(workflow.nodes.length === 1 ? workflow.nodes[0].id : null);
+      } else if (k === "d") {
+        e.preventDefault();
+        const text = copyText(workflow, selectedIds());
+        if (text) pasteClip(text);
+      } else if ((k === "c" || k === "x") && !hasTextSelection()) {
+        if (copy(k === "x")) e.preventDefault();
+      } else if (k === "v") {
+        // Let the browser's paste event bring the system clipboard; fall back to our own copy.
+        pasteHandled = false;
+        setTimeout(() => {
+          if (!pasteHandled && lastCopy.current) pasteClip(lastCopy.current);
+        }, 80);
+      }
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      if (!workflow || typing(e.target)) return;
+      pasteHandled = true;
+      const text = e.clipboardData?.getData("text/plain");
+      // Something else on the clipboard (text, an image): leave it alone.
+      if (!parseClip(text)) return;
+      e.preventDefault();
+      pasteClip(text);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("paste", onPaste);
+    };
+  }, [workflow, selectedIds, pasteClip, setNodes, select, patch]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     setSelectedEdges((cur) => {
       const next = new Set(cur);
@@ -170,7 +281,6 @@ export function Canvas() {
   );
 
   const addFileNodes = useStore((s) => s.addFileNodes);
-  const notify = useStore((s) => s.notify);
 
   const onDrop = useCallback(
     async (ev: DragEvent) => {
@@ -232,7 +342,7 @@ export function Canvas() {
       onNodeDragStop={(_, __, dragged) =>
         patch(dragged.map((n) => ({ op: "update_node", id: n.id, position: { x: Math.round(n.position.x), y: Math.round(n.position.y) } })))
       }
-      onNodeClick={(_, n) => select(n.id)}
+      onSelectionChange={onSelectionChange}
       onPaneClick={() => select(null)}
       onDragOver={(ev) => {
         if ([DND_TYPE, DND_FILE, "Files"].some((t) => ev.dataTransfer.types.includes(t))) {
@@ -242,6 +352,13 @@ export function Canvas() {
       }}
       onDrop={onDrop}
       deleteKeyCode={["Backspace", "Delete"]}
+      // Drag on empty canvas draws a selection box; pan with two-finger scroll, space + drag, or the middle / right button.
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      panOnDrag={[1, 2]}
+      panOnScroll
+      panActivationKeyCode="Space"
+      multiSelectionKeyCode={["Meta", "Control", "Shift"]}
       fitView
       fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
       minZoom={0.2}
