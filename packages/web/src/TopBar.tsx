@@ -77,8 +77,6 @@ export function TopBar() {
 
       <span className="nf-spacer" />
 
-      <LangSwitch />
-      <ThemeSwitch />
       <span className="nf-sync" data-on={connected || undefined} title={connected ? t("画布与服务实时同步，AI 的修改会马上出现") : t("与服务断开，正在重连")}>
         {connected ? t("实时同步中") : t("已断开，重连中")}
       </span>
@@ -128,6 +126,9 @@ export function TopBar() {
           )}
         </>
       )}
+      <span className="nf-top__sep" aria-hidden="true" />
+      <LangSwitch />
+      <ThemeSwitch />
     </header>
   );
 }

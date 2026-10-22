@@ -937,3 +937,67 @@ select.nf-input { padding-right: 24px; }
 @media (max-width: 1100px) {
   .nf-sync { font-size: 0; gap: 0; }
 }
+
+/* Toolbar pop-up menus (language, appearance). */
+.nf-top__sep { width: 0.5px; height: 18px; background: var(--line-strong); margin: 0 2px; }
+.nf-menu { position: relative; }
+.nf-menu__btn {
+  height: 28px; padding: 0 7px 0 8px; display: inline-flex; align-items: center; gap: 5px;
+  font: 500 12.5px var(--sans); color: var(--ink-2); background: transparent; border: 0; border-radius: 7px; cursor: pointer;
+}
+.nf-menu__btn:hover, .nf-menu__btn[aria-expanded="true"] { background: var(--panel-2); color: var(--ink); }
+.nf-menu__chev { opacity: 0.6; }
+.nf-menu__val { min-width: 1.6em; text-align: left; }
+.nf-menu__pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 160px; padding: 5px;
+  display: grid; background: var(--node); border-radius: 10px; box-shadow: var(--shadow-3);
+  transform-origin: top right; animation: nf-pop 0.12s ease-out;
+}
+.nf-menu__pop button {
+  display: flex; align-items: center; gap: 7px; padding: 5px 10px 5px 4px; border: 0; border-radius: 6px;
+  font: 13px var(--sans); color: var(--ink); background: transparent; text-align: left; cursor: default;
+}
+.nf-menu__pop button:hover, .nf-menu__pop button:focus-visible { background: var(--act); color: var(--act-ink); outline: none; }
+.nf-menu__check { width: 14px; display: inline-flex; justify-content: center; }
+.nf-menu__icon { display: inline-flex; opacity: 0.85; }
+@keyframes nf-pop { from { opacity: 0; transform: scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .nf-menu__pop { animation: none; } }
+
+/* Shortcuts guide: bottom-left of the canvas, beside the zoom controls. */
+.react-flow__panel.nf-keys__panel { margin-left: 54px; }
+.nf-keys__toggle {
+  height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px;
+  font: 500 12.5px var(--sans); color: var(--ink-2); background: var(--node); border: 0; border-radius: 9px;
+  box-shadow: var(--shadow-2); cursor: pointer;
+}
+.nf-keys__toggle:hover { color: var(--ink); }
+.nf-keys {
+  width: 300px; max-height: min(70vh, 560px); overflow: auto; padding: 4px 14px 12px;
+  background: var(--node); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow-3);
+  transform-origin: bottom left; animation: nf-pop 0.14s ease-out;
+}
+.nf-keys__head {
+  position: sticky; top: 0; display: flex; align-items: center; gap: 7px; padding: 10px 0 6px;
+  background: var(--node); color: var(--ink-2);
+}
+.nf-keys__head h2 { flex: 1; margin: 0; font: 600 13px var(--sans); color: var(--ink); }
+.nf-keys__close {
+  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.nf-keys__close:hover { background: var(--panel-2); color: var(--ink); }
+.nf-keys__group h3 { margin: 10px 0 4px; font: 600 11.5px var(--sans); color: var(--ink-3); }
+.nf-keys dl { margin: 0; display: grid; }
+.nf-keys__row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 0.5px solid var(--line); }
+.nf-keys__group dl .nf-keys__row:first-child { border-top: 0; }
+.nf-keys dt { flex: 1; font: 12.5px/1.3 var(--sans); color: var(--ink); }
+.nf-keys dd { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.nf-keys__alt { display: inline-flex; align-items: center; gap: 3px; }
+.nf-keys__or { font: 11px var(--sans); color: var(--ink-3); margin-right: 3px; }
+.nf-keys kbd {
+  min-width: 20px; height: 20px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
+  font: 500 11px var(--sans); color: var(--ink-2); background: var(--panel-2); border-radius: 5px;
+  box-shadow: inset 0 -0.5px 0 var(--line-strong);
+}
+.nf-keys kbd[data-text] { background: transparent; box-shadow: none; padding: 0; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .nf-keys { animation: none; } }

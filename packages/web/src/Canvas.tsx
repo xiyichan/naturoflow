@@ -3,6 +3,7 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   useNodesState,
   useReactFlow,
@@ -22,6 +23,7 @@ import { copyText, parseClip, pasteOps } from "./clipboard.ts";
 import { FlowNode, type FlowNodeType } from "./FlowNode.tsx";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible, typeColor } from "./ports.ts";
+import { Shortcuts } from "./Shortcuts.tsx";
 import { useStore } from "./store.ts";
 import { issueText, t } from "./i18n.ts";
 
@@ -367,6 +369,9 @@ export function Canvas() {
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1.4} color="var(--grid)" />
       <Controls showInteractive={false} />
+      <Panel position="bottom-left" className="nf-keys__panel">
+        <Shortcuts />
+      </Panel>
       <MiniMap pannable zoomable nodeStrokeWidth={2} className="nf-minimap" style={{ width: 160, height: 110 }} />
     </ReactFlow>
   );
