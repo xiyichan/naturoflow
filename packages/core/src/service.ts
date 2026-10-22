@@ -50,6 +50,8 @@ export interface ServiceConfig {
   concurrency: number;
   /** Extra read-only node directories (e.g. bundled examples). */
   nodeDirs: string[];
+  /** Reload node types when files in the node directories change (default true). */
+  watch?: boolean;
 }
 
 export function loadConfig(homeDir = process.env.NATUROFLOW_HOME ?? path.join(os.homedir(), ".naturoflow")): ServiceConfig {
@@ -121,6 +123,8 @@ export class NaturoflowService extends EventEmitter {
   readonly engine: Engine;
   private liveRuns = new Map<string, RunRecord>();
   private secrets: SecretBox;
+  private watchers: fs.FSWatcher[] = [];
+  private reloadTimer?: ReturnType<typeof setTimeout>;
 
   constructor(readonly config: ServiceConfig = loadConfig()) {
     super();
@@ -128,6 +132,7 @@ export class NaturoflowService extends EventEmitter {
     const userNodes = path.join(config.home, "nodes");
     fs.mkdirSync(userNodes, { recursive: true });
     this.registry = new NodeRegistry([...config.nodeDirs, userNodes], userNodes);
+    if (config.watch !== false) this.watchNodeDirs([...config.nodeDirs, userNodes]);
     this.store = new Store(path.join(config.home, "naturoflow.db"));
     this.secrets = new SecretBox(config.home);
     this.engine = new Engine(this.registry, {
@@ -193,7 +198,30 @@ export class NaturoflowService extends EventEmitter {
   }
 
   reloadNodeTypes() {
-    return this.registry.reload();
+    const result = this.registry.reload();
+    this.emit("event", { type: "nodeType.changed", id: "*" } satisfies ServiceEvent);
+    return result;
+  }
+
+  /** Editing a node YAML file updates open canvases without a restart. */
+  private watchNodeDirs(dirs: string[]) {
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) continue;
+      try {
+        const w = fs.watch(dir, (_event, file) => {
+          if (file && !/\.(ya?ml|json)$/.test(String(file))) return;
+          clearTimeout(this.reloadTimer);
+          this.reloadTimer = setTimeout(() => {
+            const { errors } = this.reloadNodeTypes();
+            for (const e of errors) console.error(`[naturoflow] node type ${e.file}: ${e.message}`);
+          }, 200);
+        });
+        w.unref();
+        this.watchers.push(w);
+      } catch {
+        // Watching is a convenience; reload_node_types still works without it.
+      }
+    }
   }
 
   /** Run a single node type in isolation with sample inputs/params. */
@@ -536,6 +564,8 @@ export class NaturoflowService extends EventEmitter {
   }
 
   close() {
+    clearTimeout(this.reloadTimer);
+    for (const w of this.watchers) w.close();
     this.store.close();
   }
 }

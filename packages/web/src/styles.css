@@ -432,7 +432,7 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 /* ---------- credentials ---------- */
 .nf-cred { display: grid; gap: 6px; padding: 0 0 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .nf-cred__row { display: flex; gap: 8px; align-items: center; }
-.nf-cred__add { justify-self: start; font-size: 12.5px; }
+.nf-cred__add { justify-self: start; }
 .nf-cred__empty { margin: 0; font-size: 12.5px; }
 .nf-cred__form { display: grid; gap: 10px; padding: 12px; background: var(--panel-2); border-radius: 8px; margin-top: 4px; }
 .nf-cred__form .nf-row { margin-top: 0; }

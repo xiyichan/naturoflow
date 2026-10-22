@@ -15,7 +15,11 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
   const [mode, setMode] = useState<"view" | "new" | "edit">("view");
 
   useEffect(() => {
-    api.credentials(credType).then(setList).catch(() => setList([]));
+    api.credentials(credType).then((l) => {
+      setList(l);
+      // Nothing saved yet: go straight to the form instead of making people hunt for a link.
+      if (l.length === 0) setMode((m) => (m === "view" ? "new" : m));
+    }).catch(() => setList([]));
   }, [credType, credVersion]);
 
   const selected = list?.find((c) => c.id === node.credential);
@@ -28,8 +32,8 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
         <span>凭据：{title}</span>
         {spec.required && <em>必填</em>}
       </div>
-      {list && list.length === 0 && mode === "view" ? (
-        <p className="nf-muted nf-cred__empty">还没有保存过 {title} 的凭据，先新建一个。</p>
+      {list && list.length === 0 ? (
+        <p className="nf-muted nf-cred__empty">还没有保存过 {title} 的凭据。填好下面的信息保存后，这个节点就会使用它。</p>
       ) : (
         <div className="nf-cred__row">
           <select
@@ -54,7 +58,7 @@ export function CredentialPicker({ node, spec, typeId }: { node: WorkflowNode; s
         </div>
       )}
       {mode === "view" && (
-        <button type="button" className="nf-link nf-cred__add" onClick={() => setMode("new")}>
+        <button type="button" className="nf-btn nf-cred__add" onClick={() => setMode("new")}>
           新建凭据
         </button>
       )}
