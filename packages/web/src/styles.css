@@ -1001,3 +1001,44 @@ select.nf-input { padding-right: 24px; }
 }
 .nf-keys kbd[data-text] { background: transparent; box-shadow: none; padding: 0; color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) { .nf-keys { animation: none; } }
+
+/* No-code HTTP node builder. */
+.nf-pal__new { display: flex; align-items: center; gap: 2px; }
+.nf-pal__new .nf-btn + .nf-btn { color: var(--ink-3); font-weight: 400; }
+.nf-hb { width: min(860px, calc(100vw - 32px)); }
+.nf-hb__body { flex: 1; min-height: 0; overflow: auto; padding: 4px 20px 20px; }
+.nf-hb__sec { padding: 14px 0 6px; display: grid; gap: 8px; border-bottom: 0.5px solid var(--line); }
+.nf-hb__sec:last-of-type { border-bottom: 0; }
+.nf-hb__sec h3 { margin: 0; font: 600 14px var(--cond); }
+.nf-hb__sec h4 { margin: 6px 0 0; font: 600 12px var(--sans); color: var(--ink-2); }
+.nf-hb__sec > .nf-muted { margin: 0; font-size: 12px; }
+.nf-hb__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; }
+.nf-hb__req { display: grid; grid-template-columns: 100px 1fr; gap: 8px; }
+.nf-hb__kv { display: grid; grid-template-columns: 1fr 2fr auto; gap: 6px; }
+.nf-hb__out { display: grid; grid-template-columns: 140px auto 1fr 90px auto; gap: 6px; align-items: center; }
+.nf-hb__out:not(:has(select + input)) { grid-template-columns: 140px 1fr 90px auto; }
+.nf-hb__add { justify-self: start; color: var(--act); padding-left: 0; }
+.nf-hb__check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.nf-hb__fields { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.nf-hb__fields th { text-align: left; font: 500 11.5px var(--sans); color: var(--ink-3); padding: 0 6px 4px; }
+.nf-hb__fields td { padding: 4px 6px; border-top: 0.5px solid var(--line); vertical-align: middle; }
+.nf-hb__fields td:first-child { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nf-hb__fields .nf-input { width: 100%; min-width: 70px; }
+.nf-hb__mode button { padding: 3px 8px; font-size: 12px; }
+.nf-input[data-bad] { border-color: var(--bad); }
+.nf-hb__url { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.nf-hb__probe { background: var(--node); border-radius: var(--r); box-shadow: var(--shadow-1); padding: 8px 12px; max-height: 320px; overflow: auto; }
+.nf-hb__status { margin: 0 0 6px; font: 600 12px var(--sans); color: var(--bad); }
+.nf-hb__status[data-ok] { color: var(--ok); }
+.nf-hb__yaml summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); padding: 12px 0 6px; }
+.nf-dialog__foot .nf-field__error, .nf-dialog__foot .nf-muted { margin: 0; align-self: center; font-size: 12.5px; }
+.nf-tree, .nf-tree ul { list-style: none; margin: 0; padding: 0; }
+.nf-tree ul { padding-left: 14px; border-left: 0.5px solid var(--line); margin-left: 4px; }
+.nf-tree__row { display: flex; align-items: baseline; gap: 8px; padding: 2px 4px; border-radius: 5px; font: 12px/1.5 var(--mono); }
+.nf-tree__row:hover { background: var(--panel-2); }
+.nf-tree li[data-hit] > .nf-tree__row { background: color-mix(in srgb, var(--act) 14%, transparent); }
+.nf-tree__key { color: var(--ink-2); }
+.nf-tree__val { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.nf-tree__acts { margin-left: auto; display: inline-flex; gap: 10px; opacity: 0; font-family: var(--sans); white-space: nowrap; }
+.nf-tree__row:hover .nf-tree__acts, .nf-tree__row:focus-within .nf-tree__acts { opacity: 1; }
+.nf-tree__acts .nf-link { background: none; border: 0; padding: 0; cursor: pointer; font-size: 12px; }

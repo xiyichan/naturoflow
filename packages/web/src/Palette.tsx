@@ -91,10 +91,14 @@ export function Palette() {
           onChange={(e) => setQ(e.target.value)}
           aria-label={t("搜索节点")}
         />
-        <button className="nf-btn nf-btn--ghost" onClick={() => setEditor({ mode: "new" })}>
-          
-          {t("新建节点类型")}
-        </button>
+        <div className="nf-pal__new">
+          <button className="nf-btn nf-btn--ghost" onClick={() => setEditor({ mode: "http" })} title={t("粘贴 curl 或填表，不用写代码")}>
+            {t("＋ 新建 HTTP 节点")}
+          </button>
+          <button className="nf-btn nf-btn--ghost" onClick={() => setEditor({ mode: "new" })} title={t("用 YAML 定义任意节点（HTTP、命令、脚本）")}>
+            {t("用 YAML")}
+          </button>
+        </div>
       </div>
       <p className="nf-pal__hint">{t("拖到画布上，或双击添加")}</p>
       <div className="nf-pal__list">

@@ -144,7 +144,7 @@ export interface NodeRun {
   cached?: "cache" | "reuse" | "pin";
   note?: string;
   params?: Record<string, unknown>;
-  trace?: { request?: Record<string, unknown>; response?: Record<string, unknown> };
+  trace?: { request?: Record<string, unknown>; response?: Record<string, unknown>; poll?: Record<string, unknown> };
 }
 
 export interface FileRefJson {
@@ -263,6 +263,8 @@ export const api = {
   nodeTypes: () => req<NodeTypeSummary[]>("GET", "/node-types"),
   nodeType: (id: string) => req<NodeTypeDef>("GET", `/node-types/${encodeURIComponent(id)}`),
   createNodeType: (def: unknown) => req<NodeTypeDef>("POST", "/node-types", def),
+  probe: (r: { method: string; url: string; headers: Record<string, string>; body?: string }) =>
+    req<{ status: number; ok: boolean; ms: number; body: unknown }>("POST", "/http/probe", r),
   updateNodeType: (id: string, def: unknown) => req<NodeTypeDef>("PUT", `/node-types/${encodeURIComponent(id)}`, def),
   deleteNodeType: (id: string) => req<void>("DELETE", `/node-types/${encodeURIComponent(id)}`),
   testNodeType: (id: string, inputs: unknown, params: unknown) =>

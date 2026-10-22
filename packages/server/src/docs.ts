@@ -48,6 +48,31 @@ executor:
 \`\`\`
 Result scope: status, headers, body.
 
+Async task APIs (submit, then wait for the result, e.g. video generation): add \`poll\`. After the
+first request it queries \`poll.url\` every \`interval\` until \`status\` renders to a \`done\` value
+(case-insensitive), failing on a \`failed\` value. Poll templates and \`outputs\` see the first
+response as \`submit\` and the latest status response as \`body\` / \`status\` / \`headers\`.
+\`\`\`yaml
+executor:
+  kind: http
+  method: POST
+  url: https://api.example.com/v1/videos
+  headers: { Authorization: "Bearer {{credential.api_key}}" }
+  body: { prompt: "{{params.prompt}}" }
+  poll:
+    url: "https://api.example.com/v1/videos/{{submit.body.id}}"   # GET; headers default to the submit's
+    interval: 5s
+    status: "{{body.status}}"
+    done: [succeeded]
+    failed: [failed, cancelled]
+    error: "{{body.error.message}}"   # optional failure message
+    maxWait: 20m                      # optional; also raise the node type's timeout
+  outputs: { url: "{{body.video.url}}", task_id: "{{submit.body.id}}" }
+timeout: 30m
+\`\`\`
+Status queries that hit 429/5xx or network errors are retried (up to 5 in a row). Don't set \`retry\`
+on billed async nodes: a retry submits a new task.
+
 ### command
 Spawns a binary with an argv array. No shell is involved, so templated values cannot inject commands.
 The binary must be in the server's allowedBins (default: ffmpeg, ffprobe, echo, cat, curl, convert, magick, sox).

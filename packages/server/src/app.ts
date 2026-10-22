@@ -141,6 +141,50 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     const { ops, expectedVersion } = (await body(c)) as { ops: never[]; expectedVersion?: number };
     return c.json(svc.applyPatch(c.req.param("id"), ops, expectedVersion));
   });
+  // Send one HTTP request for the node builder's "send test request", so it can show the
+  // real response and let the user pick fields. Local-only, behind the API token like the rest.
+  api.post("/http/probe", async (c) => {
+    const { method = "GET", url, headers = {}, body: payload } = (await body(c)) as {
+      method?: string;
+      url: string;
+      headers?: Record<string, string>;
+      body?: string;
+    };
+    let target: URL;
+    try {
+      target = new URL(url);
+      if (!/^https?:$/.test(target.protocol)) throw new Error();
+    } catch {
+      return c.json({ code: "INVALID_ARGUMENT", message: "url must be an http(s) URL" }, 400);
+    }
+    const started = Date.now();
+    try {
+      const m = method.toUpperCase();
+      const res = await fetch(target, {
+        method: m,
+        headers,
+        body: m === "GET" || m === "HEAD" ? undefined : payload,
+        signal: AbortSignal.timeout(60_000),
+      });
+      const text = await res.text();
+      let parsed: unknown = text;
+      try {
+        parsed = text === "" ? null : JSON.parse(text);
+      } catch {
+        // not JSON: return the text
+      }
+      return c.json({
+        status: res.status,
+        ok: res.ok,
+        ms: Date.now() - started,
+        contentType: res.headers.get("content-type") ?? undefined,
+        body: typeof parsed === "string" ? parsed.slice(0, 100_000) : parsed,
+      });
+    } catch (e) {
+      return c.json({ code: "REQUEST_FAILED", message: (e as Error).message }, 502);
+    }
+  });
+
   api.get("/workflows/:id/export", (c) => c.json(svc.exportWorkflow(c.req.param("id"))));
   api.post("/workflows/import", async (c) => {
     const { doc, name } = (await body(c)) as { doc: unknown; name?: string };

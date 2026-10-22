@@ -32,6 +32,31 @@ const OutputMap = z.record(z.string(), z.any()).optional();
 /** A map, or a single `{{...}}` template that evaluates to one. */
 const TemplatedMap = z.union([z.record(z.string(), z.any()), z.string()]).optional();
 
+/**
+ * Async APIs: after the first request (the submit), query a status URL until the task
+ * finishes. Templates here and in `outputs` see the submit response as `submit`
+ * ({status, headers, body}) and the latest poll response as `body` / `status` / `headers`.
+ */
+export const HttpPoll = z.object({
+  url: z.string(),
+  method: z.string().default("GET"),
+  /** Defaults to the submit request's headers (so auth carries over). */
+  headers: TemplatedMap,
+  query: TemplatedMap,
+  body: z.any().optional(),
+  interval: Duration.default("3s"),
+  /** Template for the task status, e.g. "{{body.status}}". */
+  status: z.string(),
+  /** Status values that mean finished (case-insensitive). */
+  done: z.array(z.string()).min(1),
+  /** Status values that mean the task failed. */
+  failed: z.array(z.string()).default([]),
+  /** Template for the failure message, e.g. "{{body.error.message}}". */
+  error: z.string().optional(),
+  /** Stop waiting after this long; defaults to the node's timeout. */
+  maxWait: Duration.optional(),
+});
+
 export const HttpExecutor = z.object({
   kind: z.literal("http"),
   method: z.string().default("GET"),
@@ -43,6 +68,8 @@ export const HttpExecutor = z.object({
   responseType: z.enum(["json", "text", "file"]).default("json"),
   /** Treat non-2xx as failure (default true). */
   failOnError: z.boolean().default(true),
+  /** Keep polling a status URL after the first request (async task APIs). */
+  poll: HttpPoll.optional(),
   outputs: OutputMap,
 });
 
@@ -242,6 +269,8 @@ export interface NodeRunRecord {
 export interface NodeTrace {
   request?: Record<string, unknown>;
   response?: Record<string, unknown>;
+  /** Async HTTP: the latest status query and how long it has been waiting. */
+  poll?: Record<string, unknown>;
 }
 
 export interface RunRecord {

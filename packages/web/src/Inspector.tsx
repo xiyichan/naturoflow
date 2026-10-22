@@ -525,6 +525,7 @@ function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
                 {n.error && <pre className="nf-run__error">{n.error}</pre>}
                 {n.trace?.request && <TraceBlock title={t("请求")} value={n.trace.request} />}
                 {n.trace?.response && <TraceBlock title={t("响应")} value={n.trace.response} />}
+                {n.trace?.poll && <TraceBlock title={t("最后一次查询状态")} value={n.trace.poll} />}
                 {n.params && Object.keys(n.params).length > 0 && <TraceBlock title={t("参数")} value={n.params} />}
                 {n.inputs && Object.keys(n.inputs).length > 0 && <Values title={t("输入")} values={n.inputs} />}
                 {n.outputs && Object.keys(n.outputs).length > 0 && <Values title={t("输出")} values={n.outputs} />}

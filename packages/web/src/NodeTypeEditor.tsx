@@ -28,7 +28,7 @@ export function NodeTypeEditor() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!editor) return dialog.current?.close();
+    if (!editor || editor.mode === "http") return dialog.current?.close();
     setError(null);
     setTestResult(null);
     setTestInputs("{}");
@@ -113,7 +113,7 @@ export function NodeTypeEditor() {
   return (
     <dialog ref={dialog} className="nf-dialog" onClose={() => setEditor(null)} aria-labelledby="nte-title">
       <header className="nf-dialog__head">
-        <h2 id="nte-title">{editor?.mode === "new" ? t("新建节点类型") : t("编辑 {0}", [editor?.mode === "edit" ? editor.id : ""])}</h2>
+        <h2 id="nte-title">{editor?.mode === "edit" ? t("编辑 {0}", [editor.id]) : t("新建节点类型")}</h2>
         <button className="nf-btn nf-btn--ghost" onClick={() => setEditor(null)}>
           
           {t("关闭")}

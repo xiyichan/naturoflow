@@ -5,6 +5,7 @@ import { Canvas } from "./Canvas.tsx";
 import { Gallery } from "./Gallery.tsx";
 import { Inspector } from "./Inspector.tsx";
 import { Lightbox } from "./Lightbox.tsx";
+import { HttpBuilder } from "./HttpBuilder.tsx";
 import { NodeTypeEditor } from "./NodeTypeEditor.tsx";
 import { Palette } from "./Palette.tsx";
 import { RunDrawer } from "./RunDrawer.tsx";
@@ -60,6 +61,7 @@ export function App() {
         )}
       </div>
       <NodeTypeEditor />
+      <HttpBuilder />
       <Lightbox />
       {notice && (
         <div className="nf-toast" data-kind={notice.kind} role="status">

@@ -25,7 +25,7 @@ export interface LightboxItem {
   sub?: string;
 }
 
-export type EditorTarget = { mode: "new" } | { mode: "edit"; id: string } | null;
+export type EditorTarget = { mode: "new" } | { mode: "edit"; id: string } | { mode: "http" } | null;
 
 interface State {
   auth: "checking" | "ok" | "needed";
