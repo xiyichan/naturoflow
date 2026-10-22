@@ -13,7 +13,7 @@ export const en: Record<string, string> = {
   "{0} 已取消选用，运行时会正常执行": "{0} no longer uses a chosen result and will run normally",
   "{0} 已选用这次的结果，运行时不再重新执行它": "{0} now uses this result and won't run again",
   "{0} 没有空着的文件输入，素材节点已放在它旁边": "{0} has no free file input; the File node was placed next to it",
-  "{0} 生成了新结果，但它仍选用着之前的结果，下游不会用新的。要用新的，在卡片上点「改用这次」": "{0} made a new result, but it still uses an earlier chosen one, so downstream won't get it. Click “Use this one” on the card to switch",
+  "{0} 生成了新结果，已改用这次作为下游的输入": "{0} made a new result and now passes it downstream",
   "{0} 的单独运行": "Single run at {0}",
   "{0} 的结果{1}": "{0} result{1}",
   "{0}{1} 个文件": "{0}{1} files",

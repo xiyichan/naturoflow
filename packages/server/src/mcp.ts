@@ -272,7 +272,7 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
     {
       title: "Update node",
       description:
-        "Change a node's params (merged unless replaceParams), position, label, type, selected credential, or pin it to an earlier result (pin: {runId}) so runs reuse that result instead of executing it.",
+        "Change a node's params (merged unless replaceParams), position, label, type, selected credential, or pin it to an earlier result (pin: {runId}) so runs reuse that result instead of executing it. When a pinned node runs again (e.g. run_node), the pin moves to the new result.",
       inputSchema: {
         workflowId,
         id: z.string(),

@@ -453,10 +453,17 @@ describe("choosing a result", () => {
     const prev = svc.nodePreviews("pin");
     expect(prev.gen.map((p) => p.outputs.n)).toEqual([2, 1]);
 
+    // Running the pinned node again makes its new result the chosen one.
+    const r4 = await svc.runSingleNode("pin", "gen"); // gen -> 3
+    expect(svc.getWorkflow("pin").nodes.find((n) => n.id === "gen")?.pin).toEqual({ runId: r4.id });
+    const r5 = await svc.runWorkflow("pin");
+    expect(r5.nodes.gen).toMatchObject({ cached: "pin", outputs: { n: 3 } });
+    expect(r5.nodes.show.outputs?.result).toBe(3);
+
     // Un-pin: gen runs again, and single runs downstream pick up its latest result.
     svc.applyPatch("pin", [{ op: "update_node", id: "gen", pin: null }]);
-    await svc.runSingleNode("pin", "gen"); // gen -> 3
-    expect((await svc.runSingleNode("pin", "show")).nodes.show.outputs?.result).toBe(3);
+    await svc.runSingleNode("pin", "gen"); // gen -> 4
+    expect((await svc.runSingleNode("pin", "show")).nodes.show.outputs?.result).toBe(4);
 
     expect(() => svc.applyPatch("pin", [{ op: "update_node", id: "gen", pin: { runId: "nope" } }])).toThrow(/no successful result/);
   });

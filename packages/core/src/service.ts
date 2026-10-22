@@ -193,7 +193,28 @@ export class NaturoflowService extends EventEmitter {
         this.liveRuns.delete(e.run.id);
       }
       this.emit("event", e);
+      if (e.type === "run.finished") this.followNewResults(e.run);
     });
+  }
+
+  /**
+   * A node that was using a chosen (pinned) result switches to the result it just produced,
+   * so the newest output is what downstream gets by default. The user can still pick an older one.
+   */
+  private followNewResults(run: RunRecord) {
+    if (run.parentRunId) return;
+    const wf = this.store.getWorkflow(run.workflowId);
+    if (!wf) return;
+    let moved = false;
+    for (const n of wf.nodes) {
+      const rec = run.nodes[n.id];
+      if (!n.pin || n.pin.runId === run.id || rec?.status !== "success" || rec.cached === "pin" || rec.cached === "reuse") continue;
+      n.pin = { runId: run.id };
+      moved = true;
+    }
+    if (!moved) return;
+    wf.version += 1;
+    this.commit(wf);
   }
 
   // ---- node types ----

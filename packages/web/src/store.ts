@@ -419,7 +419,7 @@ export const useStore = create<State>((set, get) => ({
               n?.status !== "success"
                 ? t("{0} 单独运行失败{1}", [e.run.single.nodeId, n?.error ? t("：{0}", [n.error]) : ""])
                 : pinned
-                  ? t("{0} 生成了新结果，但它仍选用着之前的结果，下游不会用新的。要用新的，在卡片上点「改用这次」", [e.run.single.nodeId])
+                  ? t("{0} 生成了新结果，已改用这次作为下游的输入", [e.run.single.nodeId])
                   : t("{0} 单独运行完成", [e.run.single.nodeId]),
             );
           }
