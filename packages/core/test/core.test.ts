@@ -149,6 +149,9 @@ describe("executors", () => {
     const run = await svc.testNodeType("test.echo", {}, { msg: "hi; rm -rf /" });
     expect(run.nodes.node.outputs?.text).toBe("hi; rm -rf /\n");
 
+    expect(run.nodes.node.trace?.request).toMatchObject({ bin: "echo", args: ["hi; rm -rf /"] });
+    expect(run.nodes.node.trace?.response).toMatchObject({ exitCode: 0, stdout: "hi; rm -rf /\n" });
+
     svc.saveNodeType({ id: "test.ls", name: "ls", executor: { kind: "command", bin: "ls" } });
     const bad = await svc.testNodeType("test.ls");
     expect(bad.nodes.node.error).toMatch(/not in allowedBins/);

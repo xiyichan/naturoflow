@@ -1,4 +1,4 @@
-import type { NodeTypeDef, RunRecord } from "../types.ts";
+import type { NodeTrace, NodeTypeDef, RunRecord } from "../types.ts";
 
 /** Return this as an output value to mark the port as not firing (used by core.if). */
 export const INACTIVE = Symbol.for("naturoflow.inactive");
@@ -10,6 +10,8 @@ export interface ExecContext {
   outDir: string;
   signal: AbortSignal;
   log: (line: string) => void;
+  /** Record what was sent/received (stored with the node run for history; masked and clipped). */
+  trace: (t: NodeTrace) => void;
   def: NodeTypeDef;
   /** Directory containing the node type file (for script `file:` resolution). */
   defDir?: string;

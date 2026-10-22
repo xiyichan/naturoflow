@@ -79,6 +79,33 @@ describe("credentials", () => {
     expect(logs).not.toContain("key-one-secret");
   });
 
+  it("keeps a per-node history with masked request/response traces", async () => {
+    const [one, two] = svc.listCredentials("test-cred").filter((c) => c.name.startsWith("key"));
+    svc.saveWorkflow({ ...wf(one.id), id: "hist" });
+    await svc.runWorkflow("hist");
+    svc.applyPatch("hist", [{ op: "update_node", id: "call", credential: two.id }]);
+    await svc.runWorkflow("hist");
+    const h = svc.nodeHistory("hist", "call");
+    expect(h).toHaveLength(2);
+    expect(h[0].runStartedAt).toBeGreaterThanOrEqual(h[1].runStartedAt);
+    const latest = h[0].node;
+    expect(latest.status).toBe("success");
+    expect(latest.params).toEqual({ url: base });
+    expect(latest.trace?.request).toMatchObject({ method: "GET", url: `${base}/`, headers: { authorization: "Bearer ****" } });
+    expect(latest.trace?.response).toMatchObject({ status: 200, body: { who: "Bearer ****" } });
+    const leaks: string[] = [];
+    const walk = (v: unknown, p: string) => {
+      if (typeof v === "string" && /key-(one|two)-secret/.test(v)) leaks.push(p);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${p}.${k}`);
+    };
+    walk(h, "h");
+    expect(leaks).toEqual([]);
+    // Paging and other nodes.
+    expect(svc.nodeHistory("hist", "call", { limit: 1 })).toHaveLength(1);
+    expect(svc.nodeHistory("hist", "call", { before: h[0].runStartedAt })).toHaveLength(h[0].runStartedAt === h[1].runStartedAt ? 0 : 1);
+    expect(svc.nodeHistory("hist", "out")[0].node.outputs).toEqual({ value: { who: "Bearer ****" } });
+  });
+
   it("validates and fails clearly without a usable credential", async () => {
     expect(svc.validateWorkflow(wf()).map((i) => i.code)).toEqual(["MISSING_CREDENTIAL"]);
     expect(svc.validateWorkflow(wf("nope")).map((i) => i.code)).toEqual(["CREDENTIAL_NOT_FOUND"]);
@@ -111,7 +138,7 @@ describe("credentials", () => {
     svc.saveWorkflow(wf(one.id));
     svc.applyPatch("w", [{ op: "update_node", id: "call", credential: two.id }]);
     expect(svc.getWorkflow("w").nodes[0].credential).toBe(two.id);
-    expect(svc.credentialUsage(two.id)).toEqual([{ workflowId: "w", nodeId: "call" }]);
+    expect(svc.credentialUsage(two.id).filter((u) => u.workflowId === "w")).toEqual([{ workflowId: "w", nodeId: "call" }]);
     svc.applyPatch("w", [{ op: "update_node", id: "call", credential: null }]);
     expect(svc.getWorkflow("w").nodes[0].credential).toBeUndefined();
   });

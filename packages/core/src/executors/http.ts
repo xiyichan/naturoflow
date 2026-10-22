@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { preview } from "../logfmt.ts";
+import { preview, redactHeaders } from "../logfmt.ts";
 import { render } from "../template.ts";
 import type { HttpExecutor } from "../types.ts";
 import type { z } from "zod";
@@ -31,6 +31,10 @@ export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string
   }
 
   args.ctx.log(`${method} ${url}`);
+  const sentBody = body === undefined ? undefined : typeof body === "string" ? tryJson(body) : String(body);
+  args.ctx.trace({
+    request: { method, url: url.toString(), headers: redactHeaders(Object.fromEntries(headers)), ...(sentBody !== undefined ? { body: sentBody } : {}) },
+  });
   const res = await fetch(url, { method, headers, body, signal: args.ctx.signal });
   args.ctx.log(`-> ${res.status} ${res.statusText}`);
 
@@ -53,6 +57,15 @@ export async function runHttp(spec: Spec, args: ExecArgs): Promise<Record<string
     } else resBody = text;
     if (res.ok) args.ctx.log(`response: ${preview(resBody)}`);
   }
+
+  args.ctx.trace({
+    response: {
+      status: res.status,
+      statusText: res.statusText,
+      contentType: res.headers.get("content-type") ?? undefined,
+      body: spec.responseType === "file" ? { savedTo: resBody } : resBody,
+    },
+  });
 
   if (spec.failOnError && !res.ok) {
     const snippet = typeof resBody === "string" ? resBody : JSON.stringify(resBody);
@@ -88,4 +101,12 @@ export function pruneUnset(v: unknown): unknown {
     if (!emptied) out[k] = pruned;
   }
   return out;
+}
+
+function tryJson(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return s;
+  }
 }

@@ -399,6 +399,29 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
   );
 
   server.registerTool(
+    "get_node_history",
+    {
+      title: "Get node history",
+      description:
+        "Past executions of one node across runs, newest first: status, params used, the HTTP request/response or command line/stdout (secrets masked), inputs, outputs and errors. Page with `before` = the last entry's runStartedAt.",
+      inputSchema: {
+        workflowId,
+        nodeId: z.string(),
+        limit: z.number().int().min(1).max(50).default(10),
+        before: z.number().optional(),
+        includeLogs: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    wrap(({ workflowId, nodeId, limit, before, includeLogs }) =>
+      svc.nodeHistory(workflowId, nodeId, { limit, before }).map((h) => {
+        const { logs, runId: _r, nodeId: _n, ...node } = h.node;
+        return { ...h, node: includeLogs ? { ...node, logs } : node };
+      }),
+    ),
+  );
+
+  server.registerTool(
     "cancel_run",
     {
       title: "Cancel run",

@@ -26,6 +26,7 @@ export async function runCommand(spec: Spec, args: ExecArgs): Promise<Record<str
   const env = { ...process.env, ...(render(spec.env ?? {}, scope) as Record<string, string>) };
 
   args.ctx.log(`$ ${bin} ${argv.map(quote).join(" ")}`);
+  args.ctx.trace({ request: { command: `${bin} ${argv.map(quote).join(" ")}`, bin, args: argv } });
   const { stdout, stderr, exitCode } = await new Promise<{ stdout: string; stderr: string; exitCode: number }>(
     (resolve, reject) => {
       const child = spawn(bin, argv, { cwd: args.ctx.outDir, env, signal: args.ctx.signal });
@@ -47,6 +48,7 @@ export async function runCommand(spec: Spec, args: ExecArgs): Promise<Record<str
     },
   );
   if (stdout.trim()) args.ctx.log(`stdout: ${preview(stdout.trim())}`);
+  args.ctx.trace({ response: { exitCode, stdout, stderr } });
   if (exitCode !== 0) throw new Error(`${bin} exited with code ${exitCode}: ${stderr.slice(-800)}`);
 
   const result = { stdout, stderr, exitCode };

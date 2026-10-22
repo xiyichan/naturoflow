@@ -147,6 +147,14 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     return c.json({ id: run.id, status: run.status }, 202);
   });
 
+  api.get("/workflows/:id/nodes/:nodeId/history", (c) =>
+    c.json(
+      svc.nodeHistory(c.req.param("id"), c.req.param("nodeId"), {
+        limit: Number(c.req.query("limit") ?? 20),
+        before: c.req.query("before") ? Number(c.req.query("before")) : undefined,
+      }),
+    ),
+  );
   api.get("/workflows/:id/interface", (c) => c.json(svc.getWorkflowInterface(c.req.param("id"))));
   api.post("/runs/:id/rerun", async (c) => {
     const { nodeId } = ((await body(c)) ?? {}) as { nodeId?: string };

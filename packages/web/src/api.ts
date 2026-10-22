@@ -124,6 +124,16 @@ export interface NodeRun {
   inactive?: string[];
   cached?: "cache" | "reuse";
   note?: string;
+  params?: Record<string, unknown>;
+  trace?: { request?: Record<string, unknown>; response?: Record<string, unknown> };
+}
+
+export interface NodeHistoryEntry {
+  runId: string;
+  runStartedAt: number;
+  runStatus: RunStatus;
+  rerunOf?: { runId: string; fromNode: string };
+  node: NodeRun;
 }
 
 export interface Run {
@@ -216,6 +226,11 @@ export const api = {
     req<{ id: string; status: RunStatus }>("POST", `/workflows/${encodeURIComponent(id)}/run`, { inputs, useCache }),
   rerun: (runId: string, nodeId: string) =>
     req<{ id: string; status: RunStatus }>("POST", `/runs/${encodeURIComponent(runId)}/rerun`, { nodeId }),
+  nodeHistory: (workflowId: string, nodeId: string, before?: number, limit = 20) =>
+    req<NodeHistoryEntry[]>(
+      "GET",
+      `/workflows/${encodeURIComponent(workflowId)}/nodes/${encodeURIComponent(nodeId)}/history?limit=${limit}${before ? `&before=${before}` : ""}`,
+    ),
   workflowInterface: (id: string) => req<WorkflowInterface>("GET", `/workflows/${encodeURIComponent(id)}/interface`),
   credentials: (type: string) => req<CredentialInfo[]>("GET", `/credentials?type=${encodeURIComponent(type)}`),
   createCredential: (type: string, name: string, data: Record<string, string>) =>

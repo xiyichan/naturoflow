@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { api, fileUrl, type NodeRun, type NodeTypeDef, type WorkflowInterface, type WorkflowNode } from "./api.ts";
+import {
+  api,
+  fileUrl,
+  type NodeHistoryEntry,
+  type NodeRun,
+  type NodeTypeDef,
+  type WorkflowInterface,
+  type WorkflowNode,
+} from "./api.ts";
 import { CredentialPicker } from "./CredentialPicker.tsx";
 import { ParamForm } from "./ParamForm.tsx";
 import { typeColor, typeLabel } from "./ports.ts";
@@ -32,7 +40,7 @@ function NodePanel({ node }: { node: WorkflowNode }) {
   const patch = useStore((s) => s.patch);
   const setEditor = useStore((s) => s.setEditor);
   const [def, setDef] = useState<NodeTypeDef | null>(null);
-  const [tab, setTab] = useState<"params" | "run">("params");
+  const [tab, setTab] = useState<"params" | "run" | "history">("params");
   const nodeRun = run?.nodes[node.id];
 
   useEffect(() => {
@@ -90,6 +98,9 @@ function NodePanel({ node }: { node: WorkflowNode }) {
           运行结果
           {nodeRun && nodeRun.status !== "pending" && <span className="nf-dot" data-status={nodeRun.status} />}
         </button>
+        <button role="tab" aria-selected={tab === "history"} onClick={() => setTab("history")}>
+          历史
+        </button>
       </div>
 
       <div className="nf-insp__body">
@@ -116,8 +127,10 @@ function NodePanel({ node }: { node: WorkflowNode }) {
           ) : (
             <p className="nf-muted">加载中…</p>
           )
-        ) : (
+        ) : tab === "run" ? (
           <RunDetail run={nodeRun} nodeId={node.id} />
+        ) : (
+          <NodeHistory nodeId={node.id} />
         )}
       </div>
     </>
@@ -396,6 +409,112 @@ function PublishSection() {
           </button>
         )}
       </div>
+    </>
+  );
+}
+
+/** Every past execution of this node, newest first, with what was sent and received. */
+function NodeHistory({ nodeId }: { nodeId: string }) {
+  const workflowId = useStore((s) => s.workflow!.id);
+  // Refetch when a run of this workflow finishes.
+  const lastFinished = useStore((s) => (s.run?.workflowId === workflowId ? s.run.finishedAt : undefined));
+  const showRun = useStore((s) => s.showRun);
+  const currentRun = useStore((s) => s.run?.id);
+  const [items, setItems] = useState<NodeHistoryEntry[] | null>(null);
+  const [more, setMore] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+  const PAGE = 20;
+
+  useEffect(() => {
+    api.nodeHistory(workflowId, nodeId, undefined, PAGE).then((h) => {
+      setItems(h);
+      setMore(h.length === PAGE);
+      setOpen((o) => o ?? h[0]?.runId ?? null);
+    });
+  }, [workflowId, nodeId, lastFinished]);
+
+  const loadMore = async () => {
+    const last = items?.at(-1);
+    if (!last) return;
+    const h = await api.nodeHistory(workflowId, nodeId, last.runStartedAt, PAGE);
+    setItems([...(items ?? []), ...h]);
+    setMore(h.length === PAGE);
+  };
+
+  if (!items) return <p className="nf-muted">加载中…</p>;
+  if (!items.length) return <p className="nf-muted">这个节点还没有执行过。运行工作流后，每次的请求和结果都会记录在这里。</p>;
+
+  return (
+    <ol className="nf-hist">
+      {items.map((h) => {
+        const n = h.node;
+        const ms = n.startedAt && n.finishedAt ? n.finishedAt - n.startedAt : undefined;
+        const isOpen = open === h.runId;
+        return (
+          <li key={h.runId} data-open={isOpen || undefined}>
+            <button className="nf-hist__row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : h.runId)}>
+              <span className="nf-dot" data-status={n.status} />
+              <span className="nf-hist__time">{new Date(n.startedAt ?? h.runStartedAt).toLocaleString()}</span>
+              {n.cached && <span className="nf-tag">{n.cached === "cache" ? "缓存" : "沿用"}</span>}
+              {h.rerunOf && <span className="nf-tag">重跑</span>}
+              <span className="nf-muted nf-hist__meta">
+                {STATUS_TEXT[n.status]}
+                {ms !== undefined && !n.cached ? `，${ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`}` : ""}
+              </span>
+            </button>
+            {isOpen && (
+              <div className="nf-hist__detail">
+                {n.error && <pre className="nf-run__error">{n.error}</pre>}
+                {n.trace?.request && <TraceBlock title="请求" value={n.trace.request} />}
+                {n.trace?.response && <TraceBlock title="响应" value={n.trace.response} />}
+                {n.params && Object.keys(n.params).length > 0 && <TraceBlock title="参数" value={n.params} />}
+                {n.inputs && Object.keys(n.inputs).length > 0 && <Values title="输入" values={n.inputs} />}
+                {n.outputs && Object.keys(n.outputs).length > 0 && <Values title="输出" values={n.outputs} />}
+                {n.logs.length > 0 && (
+                  <details className="nf-hist__logs">
+                    <summary>日志（{n.logs.length} 条）</summary>
+                    <pre className="nf-log">{n.logs.join("\n")}</pre>
+                  </details>
+                )}
+                <div className="nf-row">
+                  {h.runId !== currentRun ? (
+                    <button className="nf-btn nf-btn--ghost" onClick={() => showRun(h.runId)}>
+                      在画布上查看这次运行
+                    </button>
+                  ) : (
+                    <span className="nf-muted">画布上显示的就是这次运行</span>
+                  )}
+                  <button className="nf-btn nf-btn--ghost" onClick={() => navigator.clipboard?.writeText(JSON.stringify(n, null, 2))}>
+                    复制 JSON
+                  </button>
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+      {more && (
+        <li>
+          <button className="nf-btn nf-btn--ghost" onClick={loadMore}>
+            加载更早的记录
+          </button>
+        </li>
+      )}
+    </ol>
+  );
+}
+
+function TraceBlock({ title, value }: { title: string; value: Record<string, unknown> }) {
+  const { method, url, ...rest } = value as { method?: string; url?: string };
+  return (
+    <>
+      <h4>{title}</h4>
+      {method && url && (
+        <p className="nf-hist__url">
+          <b>{method}</b> <code>{url}</code>
+        </p>
+      )}
+      <pre className="nf-log">{JSON.stringify(method && url ? rest : value, null, 2)}</pre>
     </>
   );
 }

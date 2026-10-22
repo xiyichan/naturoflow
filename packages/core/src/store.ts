@@ -128,6 +128,30 @@ export class Store {
     return Number(this.db.prepare("DELETE FROM node_cache").run().changes);
   }
 
+  /**
+   * One node's executions across a workflow's runs, newest first. Nodes that never ran in a run
+   * (pending/skipped) are left out. `before` (a run startedAt) pages backwards.
+   */
+  nodeHistory(workflowId: string, nodeId: string, limit = 20, before?: number): NodeHistoryEntry[] {
+    const path = `$.nodes."${nodeId.replace(/"/g, "")}"`;
+    const rows = this.db
+      .prepare(
+        `SELECT id, started_at, status, json_extract(json, '$.rerunOf') AS rerun_of, json_extract(json, ?) AS node
+         FROM runs
+         WHERE workflow_id = ? AND started_at < ?
+           AND json_extract(json, ? || '.status') NOT IN ('pending', 'skipped')
+         ORDER BY started_at DESC LIMIT ?`,
+      )
+      .all(path, workflowId, before ?? Number.MAX_SAFE_INTEGER, path, limit) as Record<string, unknown>[];
+    return rows.map((r) => ({
+      runId: String(r.id),
+      runStartedAt: Number(r.started_at),
+      runStatus: String(r.status) as RunRecord["status"],
+      ...(r.rerun_of ? { rerunOf: JSON.parse(String(r.rerun_of)) } : {}),
+      node: JSON.parse(String(r.node)),
+    }));
+  }
+
   getNodeRun(runId: string, nodeId: string): NodeRunRecord | undefined {
     return this.getRun(runId)?.nodes[nodeId];
   }
@@ -159,4 +183,12 @@ function toCredentialRow(r: Record<string, unknown>): CredentialRow {
     createdAt: Number(r.created_at),
     updatedAt: Number(r.updated_at),
   };
+}
+
+export interface NodeHistoryEntry {
+  runId: string;
+  runStartedAt: number;
+  runStatus: RunRecord["status"];
+  rerunOf?: RunRecord["rerunOf"];
+  node: NodeRunRecord;
 }

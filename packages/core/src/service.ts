@@ -555,6 +555,29 @@ export class NaturoflowService extends EventEmitter {
     return run;
   }
 
+  /** A node's past executions (params, request/response, outputs, logs), newest first. */
+  nodeHistory(workflowId: string, nodeId: string, opts: { limit?: number; before?: number } = {}) {
+    this.getWorkflow(workflowId);
+    const entries = this.store.nodeHistory(workflowId, nodeId, Math.min(Math.max(opts.limit ?? 20, 1), 200), opts.before);
+    return this.maskSecrets(entries);
+  }
+
+  /**
+   * Replace every saved credential's secret values in `value` with ****. Stored outputs keep real
+   * values (downstream nodes and reruns need them); this is for displaying history.
+   */
+  private maskSecrets<T>(value: T): T {
+    const secrets = this.store
+      .listCredentials()
+      .flatMap((c) => this.resolveCredential(c.id)?.secrets ?? [])
+      .filter((v) => v.length >= 4)
+      .sort((a, b) => b.length - a.length);
+    if (!secrets.length) return value;
+    let text = JSON.stringify(value);
+    for (const v of secrets) text = text.split(JSON.stringify(v).slice(1, -1)).join("****");
+    return JSON.parse(text);
+  }
+
   listRuns(workflowId?: string, limit?: number) {
     return this.store.listRuns(workflowId, limit);
   }

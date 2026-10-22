@@ -188,6 +188,15 @@ export interface NodeRunRecord {
   cached?: "cache" | "reuse";
   /** Human-readable explanation, e.g. why a node was skipped. */
   note?: string;
+  /** Params as actually used (templates rendered, secrets masked). */
+  params?: Record<string, unknown>;
+  /** What the executor sent and got back, e.g. the HTTP request/response (secrets masked). */
+  trace?: NodeTrace;
+}
+
+export interface NodeTrace {
+  request?: Record<string, unknown>;
+  response?: Record<string, unknown>;
 }
 
 export interface RunRecord {

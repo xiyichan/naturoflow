@@ -439,3 +439,21 @@ textarea.nf-input { resize: vertical; line-height: 1.45; }
 .nf-cred__note { margin: 0; font-size: 12px; }
 .nf-cred__delete { margin-left: auto; color: var(--bad); }
 .nf-cred__row .nf-link { white-space: nowrap; }
+
+/* ---------- node history ---------- */
+.nf-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.nf-hist > li { border: 1px solid transparent; border-radius: 8px; }
+.nf-hist > li[data-open] { border-color: var(--line); background: var(--node); }
+.nf-hist__row {
+  width: 100%; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  font: 12.5px var(--sans); color: var(--ink); background: none; border: 0;
+  padding: 7px 8px; cursor: pointer; text-align: left; border-radius: 8px;
+}
+.nf-hist__row:hover { background: var(--panel-2); }
+.nf-hist__meta { margin-left: auto; }
+.nf-hist__detail { padding: 0 10px 10px; }
+.nf-hist__detail h4 { margin: 12px 0 4px; }
+.nf-hist__url { margin: 0 0 4px; font-size: 12px; word-break: break-all; }
+.nf-hist__url b { font-family: var(--mono); color: var(--run); font-size: 11.5px; }
+.nf-hist__logs { margin-top: 10px; }
+.nf-hist__logs summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); }

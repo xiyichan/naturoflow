@@ -5,13 +5,14 @@ import { createHash, randomUUID } from "node:crypto";
 import { execute, INACTIVE } from "./executors/index.ts";
 import { isFileRef, toFileRef } from "./files.ts";
 import { portCompatible } from "./ports.ts";
-import { preview } from "./logfmt.ts";
+import { clip, preview } from "./logfmt.ts";
 import { render } from "./template.ts";
 import type { NodeRegistry } from "./registry.ts";
 import {
   credentialTypeOf,
   parseDuration,
   type NodeRunRecord,
+  type NodeTrace,
   type PortDef,
   type RunRecord,
   type Workflow,
@@ -343,6 +344,12 @@ export class Engine extends EventEmitter {
       if (nr.logs.length > 2000) nr.logs.splice(0, nr.logs.length - 2000);
       this.emit("event", { type: "node.log", runId: run.id, nodeId: node.id, line } satisfies EngineEvent);
     };
+    // Stored for the node's history: masked, with long strings clipped.
+    const keep = <T>(v: T): T => JSON.parse(mask(JSON.stringify(clip(v)))) as T;
+    nr.params = keep(params);
+    const trace = (t: NodeTrace) => {
+      nr.trace = { ...nr.trace, ...keep(t) };
+    };
     // Every successful node ends its log with what it produced (masked like any other line).
     const logOutputs = (outputs?: Record<string, unknown>) => {
       if (outputs && Object.keys(outputs).length) log(`outputs: ${preview(outputs)}`);
@@ -393,6 +400,7 @@ export class Engine extends EventEmitter {
             outDir,
             signal,
             log,
+            trace,
             def,
             defDir: source ? path.dirname(source) : undefined,
             config: { allowedBins: this.opts.allowedBins },
