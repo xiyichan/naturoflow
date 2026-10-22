@@ -16,6 +16,8 @@ export interface ExecContext {
   config: { allowedBins: string[] };
   /** Values the builtin input/output nodes need. */
   runInputs: Record<string, unknown>;
+  /** Values of the node's selected credential ({{credential.<field>}} in templates). */
+  credential?: Record<string, string>;
   /** Run another stored workflow as a child of this run (used by subflow/map). */
   runSubflow: (workflowId: string, inputs: Record<string, unknown>) => Promise<RunRecord>;
 }
@@ -35,6 +37,7 @@ export function templateScope({ inputs, params, ctx }: ExecArgs, extra: Record<s
     params,
     env: process.env,
     ctx: { runId: ctx.runId, nodeId: ctx.nodeId, outDir: ctx.outDir },
+    credential: ctx.credential ?? {},
     ...extra,
   };
 }

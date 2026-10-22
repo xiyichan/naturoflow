@@ -18,6 +18,10 @@ export class Store {
         json TEXT NOT NULL, started_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS runs_wf ON runs(workflow_id, started_at DESC);
+      CREATE TABLE IF NOT EXISTS credentials (
+        id TEXT PRIMARY KEY, type TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL,
+        fields TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS node_cache (
         key TEXT PRIMARY KEY, json TEXT NOT NULL, created_at INTEGER NOT NULL
       );
@@ -79,6 +83,35 @@ export class Store {
     });
   }
 
+  // ---- credentials (data is encrypted by the service before it gets here) ----
+  listCredentials(type?: string): CredentialRow[] {
+    const rows = (
+      type
+        ? this.db.prepare("SELECT * FROM credentials WHERE type = ? ORDER BY name").all(type)
+        : this.db.prepare("SELECT * FROM credentials ORDER BY type, name").all()
+    ) as Record<string, unknown>[];
+    return rows.map(toCredentialRow);
+  }
+
+  getCredential(id: string): CredentialRow | undefined {
+    const row = this.db.prepare("SELECT * FROM credentials WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+    return row ? toCredentialRow(row) : undefined;
+  }
+
+  saveCredential(c: CredentialRow): void {
+    this.db
+      .prepare(
+        `INSERT INTO credentials (id, type, name, data, fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, data = excluded.data,
+           fields = excluded.fields, updated_at = excluded.updated_at`,
+      )
+      .run(c.id, c.type, c.name, c.data, JSON.stringify(c.fields), c.createdAt, c.updatedAt);
+  }
+
+  deleteCredential(id: string): boolean {
+    return this.db.prepare("DELETE FROM credentials WHERE id = ?").run(id).changes > 0;
+  }
+
   // ---- node output cache (implements engine NodeCache) ----
   getCache(key: string): { outputs: Record<string, unknown>; inactive?: string[] } | undefined {
     const row = this.db.prepare("SELECT json FROM node_cache WHERE key = ?").get(key) as { json: string } | undefined;
@@ -102,4 +135,28 @@ export class Store {
   close() {
     this.db.close();
   }
+}
+
+export interface CredentialRow {
+  id: string;
+  type: string;
+  name: string;
+  /** Encrypted JSON of the field values. */
+  data: string;
+  /** Names of the fields that have a value (safe to show). */
+  fields: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+function toCredentialRow(r: Record<string, unknown>): CredentialRow {
+  return {
+    id: String(r.id),
+    type: String(r.type),
+    name: String(r.name),
+    data: String(r.data),
+    fields: JSON.parse(String(r.fields)),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+  };
 }

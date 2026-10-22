@@ -8,6 +8,7 @@ import { portCompatible } from "./ports.ts";
 import { render } from "./template.ts";
 import type { NodeRegistry } from "./registry.ts";
 import {
+  credentialTypeOf,
   parseDuration,
   type NodeRunRecord,
   type PortDef,
@@ -38,6 +39,8 @@ export interface EngineOptions {
   /** Resolves workflow ids for subflow/map nodes. */
   loadWorkflow?: (id: string) => Workflow | undefined;
   cache?: NodeCache;
+  /** Decrypted credential values by id; `secrets` are masked in logs. */
+  getCredential?: (id: string) => { type: string; data: Record<string, string>; secrets: string[] } | undefined;
 }
 
 export function validateWorkflow(wf: Workflow, registry: NodeRegistry): ValidationIssue[] {
@@ -319,7 +322,22 @@ export class Engine extends EventEmitter {
     ) as Record<string, unknown>;
     nr.inputs = inputs;
 
-    const log = (line: string) => {
+    // Resolve the node's credential; its secret values never reach logs or errors.
+    let credential: Record<string, string> | undefined;
+    let secrets: string[] = [];
+    const credType = credentialTypeOf(def);
+    if (credType) {
+      const c = node.credential ? this.opts.getCredential?.(node.credential) : undefined;
+      if (node.credential && !c) return this.failEarly(run, node.id, `credential "${node.credential}" not found`);
+      if (c && c.type !== credType) return this.failEarly(run, node.id, `credential is a ${c.type} credential, expected ${credType}`);
+      if (!c && def.credentials!.required) return this.failEarly(run, node.id, `no credential selected (needs ${def.credentials!.name ?? credType})`);
+      credential = c?.data;
+      secrets = (c?.secrets ?? []).filter((v) => v.length >= 4);
+    }
+    const mask = (text: string) => secrets.reduce((t, v) => t.split(v).join("****"), text);
+
+    const log = (raw: string) => {
+      const line = mask(raw);
       nr.logs.push(line);
       if (nr.logs.length > 2000) nr.logs.splice(0, nr.logs.length - 2000);
       this.emit("event", { type: "node.log", runId: run.id, nodeId: node.id, line } satisfies EngineEvent);
@@ -372,6 +390,7 @@ export class Engine extends EventEmitter {
             defDir: source ? path.dirname(source) : undefined,
             config: { allowedBins: this.opts.allowedBins },
             runInputs: run.inputs,
+            credential,
             runSubflow: (workflowId, childInputs) => {
               const child = this.opts.loadWorkflow?.(workflowId);
               if (!child) throw new Error(`workflow "${workflowId}" not found`);
@@ -407,7 +426,11 @@ export class Engine extends EventEmitter {
         if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, backoff * attempt));
       }
     }
-    this.finishNode(run, node.id, runSignal.aborted ? "cancelled" : "failed", undefined, (lastErr as Error)?.message);
+    this.finishNode(run, node.id, runSignal.aborted ? "cancelled" : "failed", undefined, mask(String((lastErr as Error)?.message)));
+  }
+
+  private failEarly(run: RunRecord, nodeId: string, error: string) {
+    this.finishNode(run, nodeId, "failed", undefined, error);
   }
 
   private finishNode(

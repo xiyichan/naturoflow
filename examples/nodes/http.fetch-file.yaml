@@ -1,0 +1,16 @@
+id: http.fetch-file
+name: 下载链接为文件
+category: network
+description: 把上游给出的 URL 下载成本地文件（例如 Seedream 返回的图片链接），文件可在画布预览并交给 ffmpeg 等节点。
+inputs:
+  url: { type: string }
+outputs:
+  file: { type: file }
+executor:
+  kind: http
+  url: "{{inputs.url}}"
+  responseType: file
+  outputs:
+    file: "{{body}}"
+timeout: 5m
+retry: { max: 2, backoff: 2s }

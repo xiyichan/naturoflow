@@ -8,10 +8,12 @@ import YAML from "yaml";
 import { z } from "zod";
 import { Engine, topoOrder, validateWorkflow, type EngineEvent, type RunOptions, type ValidationIssue } from "./engine.ts";
 import { NodeRegistry } from "./registry.ts";
+import { SecretBox } from "./secrets.ts";
 import { Store } from "./store.ts";
 import {
   NfError,
   ToolPublish,
+  credentialTypeOf,
   Workflow,
   WorkflowEdge,
   WorkflowNode,
@@ -77,6 +79,8 @@ export const PatchOp = z.discriminatedUnion("op", [
     position: z.object({ x: z.number(), y: z.number() }).optional(),
     label: z.string().optional(),
     type: z.string().optional(),
+    /** Saved credential id to use; null clears it. */
+    credential: z.string().nullable().optional(),
   }),
   z.object({ op: z.literal("remove_node"), id: z.string() }),
   z.object({ op: z.literal("connect"), edge: WorkflowEdge }),
@@ -87,8 +91,22 @@ export const PatchOp = z.discriminatedUnion("op", [
 ]);
 export type PatchOp = z.input<typeof PatchOp>;
 
+/** A saved credential as shown to the UI / MCP: never includes secret values. */
+export interface CredentialInfo {
+  id: string;
+  type: string;
+  name: string;
+  /** Fields that have a value. */
+  fields: string[];
+  /** Non-secret field values (e.g. a region or account id), safe to display. */
+  values: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type ServiceEvent =
   | EngineEvent
+  | { type: "credentials.changed"; credentialType: string }
   | { type: "workflow.changed"; workflow: Workflow }
   | { type: "workflow.deleted"; id: string }
   | { type: "nodeType.changed"; id: string };
@@ -102,6 +120,7 @@ export class NaturoflowService extends EventEmitter {
   readonly store: Store;
   readonly engine: Engine;
   private liveRuns = new Map<string, RunRecord>();
+  private secrets: SecretBox;
 
   constructor(readonly config: ServiceConfig = loadConfig()) {
     super();
@@ -110,11 +129,13 @@ export class NaturoflowService extends EventEmitter {
     fs.mkdirSync(userNodes, { recursive: true });
     this.registry = new NodeRegistry([...config.nodeDirs, userNodes], userNodes);
     this.store = new Store(path.join(config.home, "naturoflow.db"));
+    this.secrets = new SecretBox(config.home);
     this.engine = new Engine(this.registry, {
       runsDir: path.join(config.home, "runs"),
       allowedBins: config.allowedBins,
       concurrency: config.concurrency,
       loadWorkflow: (id) => this.store.getWorkflow(id),
+      getCredential: (id) => this.resolveCredential(id),
       cache: { get: (k) => this.store.getCache(k), set: (k, v) => this.store.setCache(k, v) },
     });
     this.engine.on("event", (e: EngineEvent) => {
@@ -253,6 +274,8 @@ export class NaturoflowService extends EventEmitter {
           if (op.params) n.params = op.replaceParams ? op.params : { ...n.params, ...op.params };
           if (op.position) n.position = op.position;
           if (op.label !== undefined) n.label = op.label;
+          if (op.credential === null) delete n.credential;
+          else if (op.credential !== undefined) n.credential = op.credential;
           break;
         }
         case "remove_node":
@@ -285,7 +308,7 @@ export class NaturoflowService extends EventEmitter {
     });
     wf.version = cur.version + 1;
     const saved = this.commit(wf);
-    return { workflow: saved, issues: validateWorkflow(saved, this.registry) };
+    return { workflow: saved, issues: this.validateWorkflow(saved) };
   }
 
   /** Layered left-to-right layout by dependency depth. */
@@ -310,7 +333,114 @@ export class NaturoflowService extends EventEmitter {
 
   validateWorkflow(idOrWorkflow: string | WorkflowInput): ValidationIssue[] {
     const wf = typeof idOrWorkflow === "string" ? this.getWorkflow(idOrWorkflow) : Workflow.parse(idOrWorkflow);
-    return validateWorkflow(wf, this.registry);
+    return [...validateWorkflow(wf, this.registry), ...this.credentialIssues(wf)];
+  }
+
+  /** Nodes whose type needs a credential but have none selected, or point at a missing/wrong one. */
+  private credentialIssues(wf: Workflow): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    for (const n of wf.nodes) {
+      const def = this.registry.get(n.type)?.def;
+      const type = def && credentialTypeOf(def);
+      if (!def || !type) continue;
+      if (!n.credential) {
+        if (def.credentials!.required) {
+          issues.push({ code: "MISSING_CREDENTIAL", message: `select a ${def.credentials!.name ?? type} credential`, nodeId: n.id, path: "credential" });
+        }
+        continue;
+      }
+      const c = this.store.getCredential(n.credential);
+      if (!c) issues.push({ code: "CREDENTIAL_NOT_FOUND", message: `credential "${n.credential}" no longer exists`, nodeId: n.id, path: "credential" });
+      else if (c.type !== type) {
+        issues.push({ code: "CREDENTIAL_TYPE_MISMATCH", message: `credential "${c.name}" is a ${c.type} credential, expected ${type}`, nodeId: n.id, path: "credential" });
+      }
+    }
+    return issues;
+  }
+
+  // ---- credentials ----
+  /** The credential fields a credential type expects, taken from the node types that declare it. */
+  credentialSpec(type: string) {
+    for (const { def } of this.registry.list()) {
+      if (credentialTypeOf(def) === type) return { type, name: def.credentials!.name ?? type, fields: def.credentials!.fields };
+    }
+    return undefined;
+  }
+
+  listCredentials(type?: string): CredentialInfo[] {
+    return this.store.listCredentials(type).map((c) => this.info(c));
+  }
+
+  createCredential(input: { type: string; name: string; data: Record<string, string> }): CredentialInfo {
+    const spec = this.credentialSpec(input.type);
+    if (!spec) throw new NfError("UNKNOWN_CREDENTIAL_TYPE", `no node type declares credential type "${input.type}"`);
+    const name = input.name?.trim();
+    if (!name) throw new NfError("INVALID_ARGUMENT", "name is required");
+    const data = this.cleanCredentialData(spec.fields, input.data ?? {});
+    for (const [k, f] of Object.entries(spec.fields)) {
+      if (f.required && !data[k]) throw new NfError("INVALID_ARGUMENT", `${f.label ?? k} is required`, `data.${k}`);
+    }
+    const now = Date.now();
+    const row = { id: randomUUID().slice(0, 8), type: input.type, name, data: this.secrets.encrypt(data), fields: Object.keys(data), createdAt: now, updatedAt: now };
+    this.store.saveCredential(row);
+    this.emit("event", { type: "credentials.changed", credentialType: input.type } satisfies ServiceEvent);
+    return this.info(row);
+  }
+
+  /** Rename and/or change values. Fields left empty keep their stored value. */
+  updateCredential(id: string, input: { name?: string; data?: Record<string, string> }): CredentialInfo {
+    const cur = this.store.getCredential(id);
+    if (!cur) throw new NfError("CREDENTIAL_NOT_FOUND", `credential "${id}" not found`);
+    const spec = this.credentialSpec(cur.type);
+    const old = this.secrets.decrypt<Record<string, string>>(cur.data);
+    const data = { ...old, ...this.cleanCredentialData(spec?.fields ?? {}, input.data ?? {}) };
+    const row = { ...cur, name: input.name?.trim() || cur.name, data: this.secrets.encrypt(data), fields: Object.keys(data), updatedAt: Date.now() };
+    this.store.saveCredential(row);
+    this.emit("event", { type: "credentials.changed", credentialType: cur.type } satisfies ServiceEvent);
+    return this.info(row);
+  }
+
+  deleteCredential(id: string) {
+    const cur = this.store.getCredential(id);
+    if (!cur || !this.store.deleteCredential(id)) throw new NfError("CREDENTIAL_NOT_FOUND", `credential "${id}" not found`);
+    this.emit("event", { type: "credentials.changed", credentialType: cur.type } satisfies ServiceEvent);
+  }
+
+  /** Workflows/nodes that use a credential (shown before deleting it). */
+  credentialUsage(id: string): { workflowId: string; nodeId: string }[] {
+    return this.store.allWorkflows().flatMap((w) => w.nodes.filter((n) => n.credential === id).map((n) => ({ workflowId: w.id, nodeId: n.id })));
+  }
+
+  /** Decrypted values, for the engine only. */
+  private resolveCredential(id: string): { type: string; data: Record<string, string>; secrets: string[] } | undefined {
+    const c = this.store.getCredential(id);
+    if (!c) return undefined;
+    const data = this.secrets.decrypt<Record<string, string>>(c.data);
+    const spec = this.credentialSpec(c.type);
+    const secrets = Object.entries(data)
+      .filter(([k]) => spec?.fields[k]?.secret !== false)
+      .map(([, v]) => v);
+    return { type: c.type, data, secrets };
+  }
+
+  private cleanCredentialData(fields: Record<string, unknown>, data: Record<string, unknown>) {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (!(k in fields)) throw new NfError("INVALID_ARGUMENT", `unknown credential field "${k}"`, `data.${k}`);
+      if (typeof v === "string" && v.trim() !== "") out[k] = v.trim();
+    }
+    return out;
+  }
+
+  private info(c: { id: string; type: string; name: string; data: string; fields: string[]; createdAt: number; updatedAt: number }): CredentialInfo {
+    const spec = this.credentialSpec(c.type);
+    const values: Record<string, string> = {};
+    const nonSecret = Object.entries(spec?.fields ?? {}).filter(([, f]) => f.secret === false).map(([k]) => k);
+    if (nonSecret.length) {
+      const data = this.secrets.decrypt<Record<string, string>>(c.data);
+      for (const k of nonSecret) if (data[k]) values[k] = data[k];
+    }
+    return { id: c.id, type: c.type, name: c.name, fields: c.fields, values, createdAt: c.createdAt, updatedAt: c.updatedAt };
   }
 
   private commit(wf: Workflow): Workflow {

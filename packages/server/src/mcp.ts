@@ -18,6 +18,7 @@ export const SERVER_INFO = { name: "naturoflow", version: "0.1.0" };
 const INSTRUCTIONS = `naturoflow is a canvas workflow engine where every node type is user-definable (HTTP calls, CLI commands like ffmpeg, JS/Python scripts).
 Typical flow: list_node_types -> (create_node_type if needed; read naturoflow://docs/node-type-spec first) -> create_workflow -> apply_workflow_patch -> validate_workflow -> run_workflow -> get_run / get_node_run_logs.
 Control flow: core.if (branch), core.map (run a workflow per list item), core.subflow (call another workflow). After changing one node, rerun_from_node reuses upstream results.
+Node types with \`credentials\` need a saved credential per node (list_credentials, then update_node {credential}); the user enters key values in the canvas, never through you.
 publish_workflow turns a workflow into its own tool. Edits you make appear live on the user's canvas.`;
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -270,7 +271,7 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
     "update_node",
     {
       title: "Update node",
-      description: "Change a node's params (merged unless replaceParams), position, label or type.",
+      description: "Change a node's params (merged unless replaceParams), position, label, type or selected credential.",
       inputSchema: {
         workflowId,
         id: z.string(),
@@ -279,6 +280,7 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
         position: z.object({ x: z.number(), y: z.number() }).optional(),
         label: z.string().optional(),
         type: z.string().optional(),
+        credential: z.string().nullable().optional().describe("saved credential id (see list_credentials); null clears it"),
         expectedVersion,
       },
     },
@@ -418,6 +420,18 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
       const started = await svc.rerunFromNode(runId, nodeId, { wait: false });
       return summarizeRun(await svc.waitForRun(started.id, waitSeconds * 1000));
     }),
+  );
+
+  server.registerTool(
+    "list_credentials",
+    {
+      title: "List credentials",
+      description:
+        "Saved credentials (API keys etc.) by name and id — values are never returned. Node types that declare `credentials` need one selected per node: update_node {credential: <id>}. The user creates and fills credentials in the canvas UI; ask them to add one if none exists.",
+      inputSchema: { type: z.string().optional().describe("credential type, e.g. the node type id") },
+      annotations: { readOnlyHint: true },
+    },
+    wrap(({ type }) => svc.listCredentials(type).map(({ id, type, name, fields, values }) => ({ id, type, name, fields, values }))),
   );
 
   server.registerTool(

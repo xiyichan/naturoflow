@@ -10,6 +10,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   media: "媒体",
   script: "脚本",
   data: "数据",
+  ai: "AI 模型",
   general: "其他",
 };
 

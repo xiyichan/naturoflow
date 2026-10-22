@@ -5,5 +5,6 @@ export * from "./engine.ts";
 export * from "./ports.ts";
 export * from "./registry.ts";
 export * from "./store.ts";
+export * from "./secrets.ts";
 export * from "./service.ts";
 export { execute } from "./executors/index.ts";

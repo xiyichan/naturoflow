@@ -54,6 +54,14 @@ Resources：`naturoflow://docs/node-type-spec`、`naturoflow://workflows/{id}`�
 - 模板：`{{inputs.video.path}}`、`{{params.crf}}`、`{{ctx.outDir}}`；过滤器 `json` `fromjson` `get:'a.b'` `default:x` `basename` `string` `number`。整串只有一个 `{{ }}` 时保留原始类型。
 - 输出端口声明为 `file` 时，返回的路径会自动转成 `{ $file, path, size, mime }` 在节点间传递。
 
+## 凭据（API Key 等）
+
+节点类型用 `credentials` 声明需要哪些字段（见 `naturoflow://docs/node-type-spec`），模板里用 `{{credential.api_key}}` 引用。在画布上选中节点，参数面板顶部可以新建、切换、改名或删除凭据：同一类型可以存多个（比如 key 1 / key 2），每个节点各自选用。
+
+- 加密保存在本机 SQLite（AES-256-GCM，密钥在 `~/.naturoflow/secret.key`，权限 600）
+- 接口、MCP、运行记录里都不返回明文，日志和错误信息里出现的 key 会替换成 `****`
+- AI 通过 MCP 只能 `list_credentials` 看名字，并用 `update_node {credential}` 给节点选凭据，不能读取或填写 key
+
 ## 控制流、缓存与发布（M4）
 
 - **core.if**：`condition` 是基于 `value` / `inputs` / `params` 的 JS 表达式，只触发 `true` 或 `false` 一侧；没走到的一侧显示为「未走此分支」（不算失败）。两条分支可以汇入带可选输入的节点（如 `object.merge`）。

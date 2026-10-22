@@ -21,6 +21,7 @@ const STATUS: Record<string, number> = {
   NODE_TYPE_NOT_FOUND: 404,
   WORKFLOW_NOT_FOUND: 404,
   RUN_NOT_FOUND: 404,
+  CREDENTIAL_NOT_FOUND: 404,
   NODE_NOT_FOUND: 404,
   CONFLICT: 409,
   VERSION_CONFLICT: 409,
@@ -152,6 +153,20 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     if (!nodeId) throw new NfError("INVALID_ARGUMENT", "nodeId is required");
     const run = await svc.rerunFromNode(c.req.param("id"), nodeId, { wait: false });
     return c.json({ id: run.id, status: run.status }, 202);
+  });
+  // Credentials: values go in, never come out.
+  api.get("/credentials", (c) => c.json(svc.listCredentials(c.req.query("type") || undefined)));
+  api.get("/credential-types/:type", (c) => {
+    const spec = svc.credentialSpec(c.req.param("type"));
+    if (!spec) throw new NfError("NOT_FOUND", "unknown credential type");
+    return c.json(spec);
+  });
+  api.post("/credentials", async (c) => c.json(svc.createCredential((await body(c)) as never), 201));
+  api.put("/credentials/:id", async (c) => c.json(svc.updateCredential(c.req.param("id"), (await body(c)) as never)));
+  api.get("/credentials/:id/usage", (c) => c.json(svc.credentialUsage(c.req.param("id"))));
+  api.delete("/credentials/:id", (c) => {
+    svc.deleteCredential(c.req.param("id"));
+    return c.body(null, 204);
   });
   api.delete("/cache", (c) => c.json({ cleared: svc.clearCache() }));
   api.get("/runs", (c) => c.json(svc.listRuns(c.req.query("workflowId"), Number(c.req.query("limit") ?? 20))));

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, fileUrl, type NodeRun, type NodeTypeDef, type WorkflowInterface, type WorkflowNode } from "./api.ts";
+import { CredentialPicker } from "./CredentialPicker.tsx";
 import { ParamForm } from "./ParamForm.tsx";
 import { typeColor, typeLabel } from "./ports.ts";
 import { useStore } from "./store.ts";
@@ -97,6 +98,7 @@ function NodePanel({ node }: { node: WorkflowNode }) {
             <p className="nf-warn">找不到节点类型 <code>{node.type}</code>。新建这个类型，或者删掉这个节点。</p>
           ) : def ? (
             <>
+              {def.credentials && <CredentialPicker node={node} spec={def.credentials} typeId={def.id} />}
               <ParamForm
                 schema={def.params}
                 value={draft}

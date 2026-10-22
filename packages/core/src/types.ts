@@ -79,6 +79,29 @@ export const BuiltinExecutor = z.object({
 export const Executor = z.union([HttpExecutor, CommandExecutor, ScriptExecutor, SubflowExecutor, BuiltinExecutor]);
 export type Executor = z.infer<typeof Executor>;
 
+/**
+ * Credentials a node type needs (API keys etc.). Users save any number of credentials of a
+ * type in the UI and pick one per node; values are available to templates as {{credential.<field>}}.
+ */
+export const CredentialSpec = z.object({
+  /** Credential type id. Node types that share it share saved credentials. Defaults to the node type id. */
+  type: z.string().regex(/^[a-zA-Z0-9_.-]+$/).optional(),
+  /** Display name of the credential type, e.g. "BytePlus ModelArk". */
+  name: z.string().optional(),
+  required: z.boolean().default(true),
+  fields: z.record(
+    z.string().regex(/^[a-zA-Z0-9_]+$/),
+    z.object({
+      label: z.string().optional(),
+      description: z.string().optional(),
+      /** Secret fields are encrypted at rest, never returned by the API, and masked in logs. */
+      secret: z.boolean().default(true),
+      required: z.boolean().default(true),
+    }),
+  ),
+});
+export type CredentialSpec = z.infer<typeof CredentialSpec>;
+
 export const NodeTypeDef = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_.-]+$/, "id may only contain letters, digits, _ . -"),
   name: z.string(),
@@ -96,6 +119,7 @@ export const NodeTypeDef = z.object({
    * Off by default: only turn it on for deterministic nodes (ffmpeg yes, HTTP POST no).
    */
   cache: z.boolean().default(false),
+  credentials: CredentialSpec.optional(),
 });
 export type NodeTypeDef = z.infer<typeof NodeTypeDef>;
 export type NodeTypeInput = z.input<typeof NodeTypeDef>;
@@ -110,6 +134,8 @@ export const WorkflowNode = z.object({
   label: z.string().optional(),
   /** Override the node type's `cache` setting for this node. */
   cache: z.boolean().optional(),
+  /** Id of the saved credential this node uses (for node types that declare `credentials`). */
+  credential: z.string().optional(),
 });
 export type WorkflowNode = z.infer<typeof WorkflowNode>;
 
@@ -191,4 +217,9 @@ export class NfError extends Error {
   toJSON() {
     return { code: this.code, message: this.message, path: this.path };
   }
+}
+
+/** Credential type id for a node type (its declared type, else the node type id). */
+export function credentialTypeOf(def: NodeTypeDef): string | undefined {
+  return def.credentials ? (def.credentials.type ?? def.id) : undefined;
 }

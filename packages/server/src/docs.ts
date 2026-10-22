@@ -98,6 +98,22 @@ executor:
 - core.map — params.workflow, itemKey (default "item"), pick, concurrency, continueOnError; input \`items\` (list),
   optional \`context\` (object merged into each run's inputs) -> output \`results\` (list).
 
+## Credentials
+Declare what a node needs instead of reading env vars; users save any number of credentials per type
+in the canvas (encrypted at rest) and pick one per node. Values are \`{{credential.<field>}}\` in templates
+(\`ctx.credential\` in scripts) and are masked in logs.
+\`\`\`yaml
+credentials:
+  type: byteplus-ark        # optional; node types sharing a type share saved credentials (default: node type id)
+  name: BytePlus ModelArk
+  fields:
+    api_key: { label: API Key }            # secret by default
+    region:  { label: Region, secret: false, required: false }
+executor:
+  kind: http
+  headers: { Authorization: "Bearer {{credential.api_key}}" }
+\`\`\`
+
 ## Templated params
 A workflow node's param value may itself be a template over that node's \`inputs\` and the run's inputs:
 \`{ "duration": "{{workflow.inputs.seconds}}" }\`. This is how a workflow input reaches a param.

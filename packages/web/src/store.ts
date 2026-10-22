@@ -29,6 +29,8 @@ interface State {
   notice: { kind: "info" | "error"; text: string } | null;
   editor: EditorTarget;
   logOpen: boolean;
+  /** Bumped whenever saved credentials change, so pickers refetch. */
+  credVersion: number;
 
   init(): Promise<void>;
   loadNodeTypes(): Promise<void>;
@@ -83,6 +85,7 @@ export const useStore = create<State>((set, get) => ({
   notice: null,
   editor: null,
   logOpen: false,
+  credVersion: 0,
 
   async init() {
     try {
@@ -233,6 +236,11 @@ export const useStore = create<State>((set, get) => ({
         break;
       case "nodeType.changed":
         s.loadNodeTypes();
+        break;
+      case "credentials.changed":
+        set({ credVersion: s.credVersion + 1 });
+        // Validation issues depend on which credentials exist.
+        if (wfId) api.validate(wfId).then((issues) => get().workflow?.id === wfId && set({ issues }));
         break;
       case "run.started":
         // Child runs of subflow/map nodes belong to their parent; don't take over the canvas.

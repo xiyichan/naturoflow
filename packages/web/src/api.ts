@@ -33,8 +33,33 @@ export interface NodeTypeSummary {
   readonly: boolean;
 }
 
+export interface CredentialField {
+  label?: string;
+  description?: string;
+  secret: boolean;
+  required: boolean;
+}
+
+export interface CredentialSpec {
+  type?: string;
+  name?: string;
+  required: boolean;
+  fields: Record<string, CredentialField>;
+}
+
+export interface CredentialInfo {
+  id: string;
+  type: string;
+  name: string;
+  fields: string[];
+  values: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface NodeTypeDef extends Omit<NodeTypeSummary, "executor"> {
   params: JsonSchema;
+  credentials?: CredentialSpec;
   executor: { kind: string; [k: string]: unknown };
   timeout?: string | number;
   retry?: { max: number; backoff: string | number };
@@ -46,6 +71,7 @@ export interface WorkflowNode {
   params: Record<string, unknown>;
   position: { x: number; y: number };
   label?: string;
+  credential?: string;
 }
 
 export interface Edge {
@@ -116,7 +142,15 @@ export interface Run {
 
 export type PatchOp =
   | { op: "add_node"; node: Partial<WorkflowNode> & { id: string; type: string } }
-  | { op: "update_node"; id: string; params?: Record<string, unknown>; replaceParams?: boolean; position?: { x: number; y: number }; label?: string }
+  | {
+      op: "update_node";
+      id: string;
+      params?: Record<string, unknown>;
+      replaceParams?: boolean;
+      position?: { x: number; y: number };
+      label?: string;
+      credential?: string | null;
+    }
   | { op: "remove_node"; id: string }
   | { op: "connect"; edge: Edge }
   | { op: "disconnect"; edge: Edge }
@@ -127,6 +161,7 @@ export type ServerEvent =
   | { type: "workflow.changed"; workflow: Workflow }
   | { type: "workflow.deleted"; id: string }
   | { type: "nodeType.changed"; id: string }
+  | { type: "credentials.changed"; credentialType: string }
   | { type: "run.started"; run: Run }
   | { type: "node.started"; runId: string; nodeId: string }
   | { type: "node.log"; runId: string; nodeId: string; line: string }
@@ -182,6 +217,13 @@ export const api = {
   rerun: (runId: string, nodeId: string) =>
     req<{ id: string; status: RunStatus }>("POST", `/runs/${encodeURIComponent(runId)}/rerun`, { nodeId }),
   workflowInterface: (id: string) => req<WorkflowInterface>("GET", `/workflows/${encodeURIComponent(id)}/interface`),
+  credentials: (type: string) => req<CredentialInfo[]>("GET", `/credentials?type=${encodeURIComponent(type)}`),
+  createCredential: (type: string, name: string, data: Record<string, string>) =>
+    req<CredentialInfo>("POST", "/credentials", { type, name, data }),
+  updateCredential: (id: string, patch: { name?: string; data?: Record<string, string> }) =>
+    req<CredentialInfo>("PUT", `/credentials/${encodeURIComponent(id)}`, patch),
+  deleteCredential: (id: string) => req<void>("DELETE", `/credentials/${encodeURIComponent(id)}`),
+  credentialUsage: (id: string) => req<{ workflowId: string; nodeId: string }[]>("GET", `/credentials/${encodeURIComponent(id)}/usage`),
   clearCache: () => req<{ cleared: number }>("DELETE", "/cache"),
 
   runs: (workflowId: string) => req<Omit<Run, "nodes">[]>("GET", `/runs?workflowId=${encodeURIComponent(workflowId)}&limit=10`),
@@ -200,6 +242,7 @@ export function subscribe(onEvent: (e: ServerEvent) => void, onStatus: (connecte
     "workflow.changed",
     "workflow.deleted",
     "nodeType.changed",
+    "credentials.changed",
     "run.started",
     "node.started",
     "node.log",
