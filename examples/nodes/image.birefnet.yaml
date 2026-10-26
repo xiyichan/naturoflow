@@ -21,11 +21,33 @@ params:
       description: >-
         birefnet-lite 速度快、约 224 MB；birefnet 边缘和细节更好，约 973 MB，更慢（两者 MIT 协议，可商用）。
         rmbg-2.0（约 1 GB）和 rmbg-2.0-int8（量化版，约 366 MB，更快）为 CC BY-NC 4.0，仅限非商用
+    decontaminate:
+      type: boolean
+      default: true
+      description: 去除边缘的背景色：把半透明边缘里混进去的原背景颜色去掉，解决抠完换到深色或彩色背景上出现的白边、色边
+    edge_cutoff:
+      type: number
+      default: 0.1
+      minimum: 0
+      maximum: 0.45
+      description: 边缘裁剪（0–0.45）：去掉很淡的半透明部分。还有一圈淡淡的背景就调大（如 0.2～0.3），边缘太硬、毛发变秃就调小
+    edge_shrink:
+      type: integer
+      default: 0
+      minimum: 0
+      maximum: 20
+      description: 边缘收缩（像素）：把主体边缘往里收几像素，直接切掉残留的背景边。一般 1～3，图越大可以越大
+    edge_feather:
+      type: number
+      default: 0
+      minimum: 0
+      maximum: 10
+      description: 边缘羽化（像素）：让边缘更柔和，常和「边缘收缩」一起用（比如收缩 2、羽化 1）
     threshold:
       type: number
       minimum: 0
       maximum: 1
-      description: 硬边阈值（0–1）。不填保留柔和的半透明边缘（头发、毛发更自然）；填了以后蒙版只有全透明和不透明，比如 0.5
+      description: 硬边阈值（0–1）。不填保留柔和的半透明边缘（头发、毛发更自然）；填了以后蒙版只有全透明和不透明，比如 0.5，这时「边缘裁剪」不生效
 outputs:
   image:
     type: file
@@ -87,6 +109,10 @@ i18n:
       model: >-
         birefnet-lite is fast (~224 MB); birefnet has better edges and detail (~973 MB) but is slower (both MIT, commercial use OK).
         rmbg-2.0 (~1 GB) and rmbg-2.0-int8 (quantized, ~366 MB, faster) are CC BY-NC 4.0, non-commercial only
+      decontaminate: Remove the old background's color from semi-transparent edges, so there's no white or colored halo on a new background
+      edge_cutoff: Drop the faintest semi-transparent parts (0–0.45). Raise it (0.2–0.3) if a faint ring of background remains; lower it if edges get too hard or hair thins out
+      edge_shrink: Pull the subject's edge in by this many pixels, cutting off leftover background. Usually 1–3; more for large images
+      edge_feather: Soften the edge by this many pixels; often paired with shrink (e.g. shrink 2, feather 1)
       threshold: Hard-edge cutoff (0–1). Empty keeps soft, semi-transparent edges (better for hair and fur); set e.g. 0.5 for fully opaque or fully transparent only
     outputs:
       image: The cut-out as a transparent PNG

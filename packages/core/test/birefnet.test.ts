@@ -46,5 +46,12 @@ describe("image.birefnet", () => {
     expect(alphaAt(out.image.path, 4, 4)).toBe(0);
     expect(alphaAt(out.image.path, 128, 128)).toBe(255);
     expect(fs.existsSync(out.mask.path)).toBe(true);
-  }, 60_000);
+
+    // Shrinking pulls the edge in: a pixel just inside the square becomes transparent.
+    const edge = (o: unknown) => alphaAt((o as { image: { path: string } }).image.path, 67, 128);
+    const soft = (await run({})).nodes.node.outputs;
+    const shrunk = (await run({ edge_shrink: 5 })).nodes.node.outputs;
+    expect(edge(soft)).toBeGreaterThan(200);
+    expect(edge(shrunk)).toBeLessThan(edge(soft));
+  }, 120_000);
 });
