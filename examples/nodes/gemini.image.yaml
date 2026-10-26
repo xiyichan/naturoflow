@@ -1,0 +1,150 @@
+id: gemini.image
+name: Gemini 生成图片（Nano Banana）
+category: ai
+description: >-
+  Gemini 图片模型（Nano Banana）的 generateContent 接口：文生图、图生图、多图合成、对话式改图。
+  参考图从 image、image_2… 端口传入本地文件或 URL（会转成 base64 内联发送）。
+  模型思考过程中的草稿图默认不保存，只输出最终图片。只发送设置过的参数。
+credentials:
+  type: gemini
+  name: Gemini
+  fields:
+    api_key:
+      label: API Key
+      description: 以 x-goog-api-key 请求头发送
+    base_url:
+      label: 接口地址
+      secret: false
+      required: false
+      description: 留空使用 Google 官方 https://generativelanguage.googleapis.com/v1beta；用代理或中转时填它的地址（到 /v1beta 为止）
+inputs:
+  image:
+    type: any
+    required: false
+    description: 参考图 1。本地文件、URL，或它们的列表
+  image_2:
+    type: any
+    required: false
+    description: 参考图 2
+  image_3:
+    type: any
+    required: false
+    description: 参考图 3
+  image_4:
+    type: any
+    required: false
+    description: 参考图 4
+  prompt:
+    type: string
+    required: false
+    description: 接上时代替参数里的提示词
+params:
+  type: object
+  required: [model]
+  properties:
+    prompt:
+      type: string
+      format: multiline
+      description: 提示词。改图时描述要怎么改，多张参考图可以用「图1」「图2」指代
+    model:
+      type: string
+      default: gemini-nano-banana-2.1
+      description: 模型名，拼在 /models/<模型>:generateContent 里。官方例如 gemini-2.5-flash-image、gemini-3-pro-image-preview；代理按它的文档填
+    aspect_ratio:
+      type: string
+      enum: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
+      description: 画面比例（imageConfig.aspectRatio）。不填由模型决定，改图时一般跟随参考图
+    image_size:
+      type: string
+      enum: [1K, 2K, 4K]
+      description: 分辨率（imageConfig.imageSize），1K 约 1024 像素。不是所有模型都支持 2K / 4K
+    image:
+      type: string
+      format: multiline
+      description: 额外的参考图 URL 或本地文件路径，每行一张，排在端口传入的图之后
+    system:
+      type: string
+      format: multiline
+      description: 系统指令（systemInstruction），比如固定的风格要求
+    temperature:
+      type: number
+      minimum: 0
+      maximum: 2
+      description: 随机程度，不填用模型默认
+    seed:
+      type: integer
+      description: 随机种子，相同参数和种子更容易得到相近的结果（不保证完全一致）
+    image_only:
+      type: boolean
+      default: false
+      description: 只要图片（responseModalities 只填 IMAGE）。默认同时返回文字说明
+    keep_drafts:
+      type: boolean
+      default: false
+      description: 同时保存模型思考过程中的草稿图（输出 drafts）
+outputs:
+  file:
+    type: file
+    required: false
+    description: 第一张最终图片
+  files:
+    type: list<file>
+    description: 全部最终图片
+  text:
+    type: string
+    required: false
+    description: 模型返回的文字（不含思考过程）
+  thoughts:
+    type: string
+    required: false
+    description: 模型的思考摘要
+  drafts:
+    type: list<file>
+    required: false
+    description: 思考过程中的草稿图（开启 keep_drafts 时）
+  usage:
+    type: json
+    required: false
+executor:
+  kind: script
+  language: js
+  file: gemini.image.mjs
+# Billed per call, so never retried automatically.
+timeout: 5m
+i18n:
+  en:
+    name: Gemini image (Nano Banana)
+    description: >-
+      Gemini image models (Nano Banana) via generateContent: text-to-image, image editing, multi-image composition.
+      Reference images come in through the image, image_2… ports as local files or URLs (sent inline as base64).
+      Draft images from the model's thinking aren't saved by default — only the final images. Only params you set are sent.
+    credentials:
+      fields:
+        api_key:
+          description: Sent as the x-goog-api-key header
+        base_url:
+          label: Base URL
+          description: Leave empty for Google's https://generativelanguage.googleapis.com/v1beta; set your proxy's address otherwise (up to /v1beta)
+    inputs:
+      image: Reference image 1. A local file, a URL, or a list of them
+      image_2: Reference image 2
+      image_3: Reference image 3
+      image_4: Reference image 4
+      prompt: When connected, used instead of the prompt param
+    params:
+      prompt: The prompt. For edits, describe the change; refer to several references as "image 1", "image 2"
+      model: Model name, used in /models/<model>:generateContent. Google's include gemini-2.5-flash-image and gemini-3-pro-image-preview; for a proxy, see its docs
+      aspect_ratio: Aspect ratio (imageConfig.aspectRatio). Empty lets the model decide; edits usually follow the reference
+      image_size: Resolution (imageConfig.imageSize); 1K is about 1024 px. Not every model supports 2K / 4K
+      image: Extra reference image URLs or local paths, one per line, after the images from ports
+      system: System instruction (systemInstruction), e.g. a fixed style
+      temperature: Randomness; empty uses the model's default
+      seed: Random seed; the same params and seed tend to give similar results (not guaranteed)
+      image_only: Images only (responseModalities IMAGE). By default a text reply comes back too
+      keep_drafts: Also save the draft images from the model's thinking (drafts output)
+    outputs:
+      file: The first final image
+      files: All final images
+      text: The model's text reply (without its thinking)
+      thoughts: Summary of the model's thinking
+      drafts: Draft images from its thinking (with keep_drafts)
