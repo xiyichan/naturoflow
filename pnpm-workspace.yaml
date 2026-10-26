@@ -2,5 +2,7 @@ packages:
   - "packages/*"
 allowBuilds:
   esbuild: true
+  # Its install script only fetches Linux CUDA binaries; the CPU/macOS ones ship in the package.
+  onnxruntime-node: false
 minimumReleaseAgeExclude:
   - vite@8.3.5

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { z } from "zod";
 import { Engine, topoOrder, validateWorkflow, type EngineEvent, type RunOptions, type ValidationIssue } from "./engine.ts";
+import { ModelManager, type ModelStatus } from "./models.ts";
 import { NodeRegistry } from "./registry.ts";
 import { isFileRef, toFileRef } from "./files.ts";
 import { SecretBox } from "./secrets.ts";
@@ -18,6 +19,7 @@ import {
   WorkflowExport,
   type ImportWarning,
   credentialTypeOf,
+  type NodeTypeDef,
   type FileRef,
   Workflow,
   WorkflowEdge,
@@ -161,7 +163,8 @@ export type ServiceEvent =
   | { type: "credentials.changed"; credentialType: string }
   | { type: "workflow.changed"; workflow: Workflow }
   | { type: "workflow.deleted"; id: string }
-  | { type: "nodeType.changed"; id: string };
+  | { type: "nodeType.changed"; id: string }
+  | { type: "model.changed"; model: ModelStatus };
 
 /**
  * The single service layer. REST, WebSocket, MCP and the CLI all call into this,
@@ -188,6 +191,7 @@ export class NaturoflowService extends EventEmitter {
     this.store.cancelInterruptedRuns("interrupted: the server stopped while this was running");
     this.engine = new Engine(this.registry, {
       runsDir: path.join(config.home, "runs"),
+      modelsDir: path.join(config.home, "models"),
       allowedBins: config.allowedBins,
       concurrency: config.concurrency,
       loadWorkflow: (id) => this.store.getWorkflow(id),
@@ -505,7 +509,46 @@ export class NaturoflowService extends EventEmitter {
 
   validateWorkflow(idOrWorkflow: string | WorkflowInput): ValidationIssue[] {
     const wf = typeof idOrWorkflow === "string" ? this.getWorkflow(idOrWorkflow) : Workflow.parse(idOrWorkflow);
-    return [...validateWorkflow(wf, this.registry), ...this.credentialIssues(wf)];
+    return [...validateWorkflow(wf, this.registry), ...this.credentialIssues(wf), ...this.modelIssues(wf)];
+  }
+
+  // ---- models ----
+  private _models?: ModelManager;
+  get models(): ModelManager {
+    return (this._models ??= new ModelManager(
+      path.join(this.config.home, "models"),
+      () => this.registry.list().flatMap(({ def }) => (def.models ?? []).map((spec) => ({ spec, nodeType: def.id }))),
+      (model) => {
+        this.emit("event", { type: "model.changed", model } satisfies ServiceEvent);
+      },
+    ));
+  }
+
+  /** The model a node will use: its `model` param (or that param's default), else the only one. */
+  modelFor(def: NodeTypeDef, params: Record<string, unknown>) {
+    const models = def.models ?? [];
+    if (!models.length) return undefined;
+    const props = (def.params.properties ?? {}) as Record<string, { default?: unknown }>;
+    const chosen = params.model ?? props.model?.default;
+    return models.find((m) => m.id === chosen) ?? (models.length === 1 ? models[0] : undefined);
+  }
+
+  /** Nodes whose model isn't downloaded yet. */
+  private modelIssues(wf: Workflow): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+    for (const n of wf.nodes) {
+      const def = this.registry.get(n.type)?.def;
+      const m = def && this.modelFor(def, n.params);
+      if (!m || this.models.isDownloaded(m.id)) continue;
+      issues.push({
+        code: "MISSING_MODEL",
+        message: `model "${m.name ?? m.id}" isn't downloaded yet: open the node and download it (or call download_model)`,
+        nodeId: n.id,
+        path: "model",
+        args: { model: m.id, name: m.name ?? m.id, ...(m.size ? { size: m.size } : {}) },
+      });
+    }
+    return issues;
   }
 
   /** Nodes whose type needs a credential but have none selected, or point at a missing/wrong one. */
@@ -1006,6 +1049,7 @@ export class NaturoflowService extends EventEmitter {
   }
 
   close() {
+    for (const m of this._models?.list() ?? []) this._models?.cancel(m.id);
     clearTimeout(this.reloadTimer);
     for (const w of this.watchers) w.close();
     this.store.close();

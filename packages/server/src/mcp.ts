@@ -233,6 +233,45 @@ export function createMcpServer(svc: NaturoflowService): McpServer {
   );
 
   server.registerTool(
+    "list_models",
+    {
+      title: "List models",
+      description:
+        "Model files that node types need (e.g. local AI models), with whether each is downloaded. Workflows using a node whose model isn't downloaded report MISSING_MODEL and won't run.",
+      inputSchema: { nodeType: z.string().optional().describe("only models of this node type") },
+    },
+    wrap(({ nodeType }) => svc.models.list(nodeType)),
+  );
+
+  server.registerTool(
+    "download_model",
+    {
+      title: "Download model",
+      description:
+        "Download a model a node type declares (can be hundreds of MB; ask the user first). By default waits until it finishes. `mirror` replaces https://huggingface.co, e.g. https://hf-mirror.com.",
+      inputSchema: {
+        id: z.string(),
+        mirror: z.string().optional(),
+        wait: z.boolean().default(true).describe("false: start it and return; watch list_models for progress"),
+      },
+    },
+    wrap(async ({ id, mirror, wait }) => {
+      const { status, done } = svc.models.download(id, { mirror });
+      return wait ? await done : status;
+    }),
+  );
+
+  server.registerTool(
+    "delete_model",
+    {
+      title: "Delete model",
+      description: "Delete a downloaded model file to free disk space (or cancel its download).",
+      inputSchema: { id: z.string() },
+    },
+    wrap(({ id }) => svc.models.remove(id)),
+  );
+
+  server.registerTool(
     "export_workflow",
     {
       title: "Export workflow",

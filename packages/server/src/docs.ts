@@ -123,6 +123,19 @@ executor:
 - core.map — params.workflow, itemKey (default "item"), pick, concurrency, continueOnError; input \`items\` (list),
   optional \`context\` (object merged into each run's inputs) -> output \`results\` (list).
 
+## Models
+Nodes that run a local model file declare it; nothing downloads mid-run. The node's panel (or the
+\`download_model\` MCP tool) fetches it into \`<home>/models/<id><ext>\`; until then workflows using it
+report MISSING_MODEL. Scripts find the file under \`ctx.modelsDir\`. With several models, a \`model\` param
+picks one by id.
+\`\`\`yaml
+models:
+  - id: birefnet-lite                 # file name: <id> + the URL's extension
+    name: BiRefNet lite
+    url: https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
+    size: 224                         # MB, shown before downloading
+\`\`\`
+
 ## Credentials
 Declare what a node needs instead of reading env vars; users save any number of credentials per type
 in the canvas (encrypted at rest) and pick one per node. Values are \`{{credential.<field>}}\` in templates

@@ -18,6 +18,8 @@ export interface ExecContext {
   config: { allowedBins: string[] };
   /** Values the builtin input/output nodes need. */
   runInputs: Record<string, unknown>;
+  /** Where downloaded model files live (see ModelManager). */
+  modelsDir?: string;
   /** Values of the node's selected credential ({{credential.<field>}} in templates). */
   credential?: Record<string, string>;
   /** Run another stored workflow as a child of this run (used by subflow/map). */

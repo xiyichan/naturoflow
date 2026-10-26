@@ -146,6 +146,7 @@ export function issueText(i: { code: string; message: string; args?: Record<stri
     case "TYPE_MISMATCH": return t("类型不匹配：{0}（{1}）→ {2}（{3}）", [a!.from, a!.fromType, a!.to, a!.toType]);
     case "MISSING_CREDENTIAL": return t("请选择 {0} 凭据", [a![`name_${lang}`] ?? a!.name]);
     case "CREDENTIAL_NOT_FOUND": return t("选择的凭据已被删除，请重新选择");
+    case "MISSING_MODEL": return t("模型 {0} 还没有下载，在节点面板里点「下载模型」", [a!.name]);
     case "CREDENTIAL_TYPE_MISMATCH": return t("凭据“{0}”的类型是 {1}，这里需要 {2}", [a!.name, a!.type, a!.expected]);
     default: return i.message;
   }

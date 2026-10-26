@@ -4,6 +4,7 @@ export * from "./logfmt.ts";
 export * from "./files.ts";
 export * from "./engine.ts";
 export * from "./ports.ts";
+export * from "./models.ts";
 export * from "./registry.ts";
 export * from "./store.ts";
 export * from "./secrets.ts";

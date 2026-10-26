@@ -1108,3 +1108,19 @@ select.nf-input { padding-right: var(--sp-6); }
 .nf-runs .nf-tag { flex-shrink: 1; }
 .nf-runs { grid-template-columns: minmax(0, 1fr); }
 .nf-runs li { min-width: 0; }
+
+/* Model downloads (ModelPanel). */
+.nf-models { background: var(--node); border-radius: var(--r); box-shadow: var(--shadow-1); padding: var(--sp-3); margin-bottom: var(--sp-3h); }
+.nf-models h4 { margin: 0 0 var(--sp-2); }
+.nf-models ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.nf-models li + li { border-top: 0.5px solid var(--line); padding-top: var(--sp-2); }
+.nf-models__row { display: flex; align-items: center; gap: var(--sp-2); }
+.nf-models__name { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.nf-models__name strong { font-size: var(--fs-footnote); }
+.nf-models__name .nf-muted { font-size: var(--fs-caption); }
+.nf-models__ok { font-size: var(--fs-caption); color: var(--ok); white-space: nowrap; }
+.nf-models__progress { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-1h); }
+.nf-models__progress progress { flex: 1; height: 6px; accent-color: var(--act); }
+.nf-models__progress .nf-muted { font-size: var(--fs-caption); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nf-models__mirror { margin-top: var(--sp-2); background: none; border: 0; padding: 0; cursor: pointer; font-size: var(--fs-caption); }
+.nf-models .nf-field { margin-top: var(--sp-2); }

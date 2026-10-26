@@ -37,6 +37,8 @@ export type EngineEvent =
 
 export interface EngineOptions {
   runsDir: string;
+  /** Downloaded model files (ctx.modelsDir for scripts). */
+  modelsDir?: string;
   allowedBins: string[];
   concurrency?: number;
   defaultTimeoutMs?: number;
@@ -433,6 +435,7 @@ export class Engine extends EventEmitter {
             def,
             defDir: source ? path.dirname(source) : undefined,
             config: { allowedBins: this.opts.allowedBins },
+            modelsDir: this.opts.modelsDir,
             runInputs: run.inputs,
             credential,
             runSubflow: (workflowId, childInputs) => {

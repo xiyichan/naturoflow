@@ -129,6 +129,16 @@ export const CredentialSpec = z.object({
 });
 export type CredentialSpec = z.infer<typeof CredentialSpec>;
 
+/** A model file a node type needs (downloaded on request, see ModelManager). */
+export const ModelSpec = z.object({
+  id: z.string().regex(/^[a-zA-Z0-9_.-]+$/, "model id may only contain letters, digits, _ . -"),
+  name: z.string().optional(),
+  url: z.string().url(),
+  /** Approximate size in MB, shown before downloading. */
+  size: z.number().optional(),
+});
+export type ModelSpec = z.infer<typeof ModelSpec>;
+
 export const NodeTypeDef = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_.-]+$/, "id may only contain letters, digits, _ . -"),
   name: z.string(),
@@ -147,6 +157,11 @@ export const NodeTypeDef = z.object({
    */
   cache: z.boolean().default(false),
   credentials: CredentialSpec.optional(),
+  /**
+   * Model files the node needs. With several, the `model` param picks one by id. Scripts find
+   * them in ctx.modelsDir; runs fail with MISSING_MODEL until the model is downloaded.
+   */
+  models: z.array(ModelSpec).optional(),
   /**
    * UI texts in other languages, keyed by language code:
    * `i18n: { en: { name, description, params: {key: help}, inputs: {port: help}, outputs, credentials: { name, fields: {key: {label, description}} } } }`.

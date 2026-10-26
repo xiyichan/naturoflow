@@ -13,6 +13,7 @@ import { ParamForm } from "./ParamForm.tsx";
 import { typeColor, typeLabel } from "./ports.ts";
 import { useStore } from "./store.ts";
 import { formatDateTime, formatShort, formatTime, issueText, t } from "./i18n.ts";
+import { ModelPanel } from "./ModelPanel.tsx";
 import { Empty } from "./Empty.tsx";
 import { IconClock } from "./icons.tsx";
 
@@ -137,6 +138,7 @@ function NodePanel({ node }: { node: WorkflowNode }) {
             <p className="nf-warn">{t("找不到节点类型")} <code>{node.type}</code>{t("。新建这个类型，或者删掉这个节点。")}</p>
           ) : def ? (
             <>
+              {def.models?.length ? <ModelPanel def={def} node={node} /> : null}
               {def.credentials && <CredentialPicker node={node} spec={def.credentials} typeId={def.id} />}
               <ParamForm
                 schema={def.params}

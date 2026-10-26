@@ -58,9 +58,29 @@ export interface CredentialInfo {
   updatedAt: number;
 }
 
+export interface ModelSpec {
+  id: string;
+  name?: string;
+  url: string;
+  size?: number;
+}
+
+export interface ModelStatus {
+  id: string;
+  name: string;
+  url: string;
+  sizeMb?: number;
+  downloaded: boolean;
+  bytes?: number;
+  progress?: { received: number; total?: number };
+  error?: string;
+  nodeTypes: string[];
+}
+
 export interface NodeTypeDef extends Omit<NodeTypeSummary, "executor"> {
   params: JsonSchema;
   credentials?: CredentialSpec;
+  models?: ModelSpec[];
   executor: { kind: string; [k: string]: unknown };
   timeout?: string | number;
   retry?: { max: number; backoff: string | number };
@@ -226,6 +246,7 @@ export type ServerEvent =
   | { type: "workflow.deleted"; id: string }
   | { type: "nodeType.changed"; id: string }
   | { type: "credentials.changed"; credentialType: string }
+  | { type: "model.changed"; model: ModelStatus }
   | { type: "run.started"; run: Run }
   | { type: "node.started"; runId: string; nodeId: string }
   | { type: "node.log"; runId: string; nodeId: string; line: string }
@@ -263,6 +284,10 @@ export const api = {
   nodeTypes: () => req<NodeTypeSummary[]>("GET", "/node-types"),
   nodeType: (id: string) => req<NodeTypeDef>("GET", `/node-types/${encodeURIComponent(id)}`),
   createNodeType: (def: unknown) => req<NodeTypeDef>("POST", "/node-types", def),
+  models: (nodeType?: string) => req<ModelStatus[]>("GET", `/models${nodeType ? `?nodeType=${encodeURIComponent(nodeType)}` : ""}`),
+  downloadModel: (id: string, mirror?: string) => req<ModelStatus>("POST", `/models/${encodeURIComponent(id)}/download`, { mirror }),
+  cancelModel: (id: string) => req<{ cancelled: boolean }>("POST", `/models/${encodeURIComponent(id)}/cancel`),
+  deleteModel: (id: string) => req<ModelStatus>("DELETE", `/models/${encodeURIComponent(id)}`),
   probe: (r: { method: string; url: string; headers: Record<string, string>; body?: string }) =>
     req<{ status: number; ok: boolean; ms: number; body: unknown }>("POST", "/http/probe", r),
   updateNodeType: (id: string, def: unknown) => req<NodeTypeDef>("PUT", `/node-types/${encodeURIComponent(id)}`, def),
@@ -348,6 +373,7 @@ export function subscribe(onEvent: (e: ServerEvent) => void, onStatus: (connecte
     "workflow.deleted",
     "nodeType.changed",
     "credentials.changed",
+    "model.changed",
     "run.started",
     "node.started",
     "node.log",

@@ -11,7 +11,7 @@ const WORKER = new URL("./script-worker.mjs", import.meta.url);
 
 export async function runScript(spec: Spec, args: ExecArgs): Promise<Record<string, unknown>> {
   const file = spec.file ? path.resolve(args.ctx.defDir ?? process.cwd(), spec.file) : undefined;
-  const ctx = { runId: args.ctx.runId, nodeId: args.ctx.nodeId, outDir: args.ctx.outDir, credential: args.ctx.credential ?? {} };
+  const ctx = { runId: args.ctx.runId, nodeId: args.ctx.nodeId, outDir: args.ctx.outDir, modelsDir: args.ctx.modelsDir, credential: args.ctx.credential ?? {} };
   return spec.language === "python"
     ? runPython(spec.code, file, args, ctx)
     : runJs(spec.code, file, args, ctx);

@@ -185,6 +185,15 @@ export function createApp(svc: NaturoflowService, opts: AppOptions) {
     }
   });
 
+  // Model files node types declare; downloaded only on request, progress via model.changed events.
+  api.get("/models", (c) => c.json(svc.models.list(c.req.query("nodeType") || undefined)));
+  api.post("/models/:id/download", async (c) => {
+    const { mirror } = ((await body(c)) ?? {}) as { mirror?: string };
+    return c.json(svc.models.download(c.req.param("id"), { mirror }).status, 202);
+  });
+  api.post("/models/:id/cancel", (c) => c.json({ cancelled: svc.models.cancel(c.req.param("id")) }));
+  api.delete("/models/:id", (c) => c.json(svc.models.remove(c.req.param("id"))));
+
   api.get("/workflows/:id/export", (c) => c.json(svc.exportWorkflow(c.req.param("id"))));
   api.post("/workflows/import", async (c) => {
     const { doc, name } = (await body(c)) as { doc: unknown; name?: string };

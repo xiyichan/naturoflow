@@ -1,20 +1,7 @@
 import { create } from "zustand";
 import { freshNodeId } from "./ids.ts";
 import { portCompatible } from "./ports.ts";
-import {
-  type NodePreview,
-  api,
-  ApiError,
-  type NodeRun,
-  type NodeTypeDef,
-  type NodeTypeSummary,
-  type PatchOp,
-  type Run,
-  type ServerEvent,
-  type ValidationIssue,
-  type Workflow,
-  type WorkflowSummary,
-} from "./api.ts";
+import { type NodePreview, api, ApiError, type NodeRun, type NodeTypeDef, type NodeTypeSummary, type PatchOp, type Run, type ServerEvent, type ValidationIssue, type Workflow, type WorkflowSummary, type ModelStatus } from "./api.ts";
 import { importWarningText, localizeDef, t } from "./i18n.ts";
 
 export interface LightboxItem {
@@ -43,6 +30,9 @@ interface State {
   logOpen: boolean;
   /** Bumped whenever saved credentials change, so pickers refetch. */
   credVersion: number;
+  /** Latest known status of downloadable models, by id (filled by the model panel and live events). */
+  models: Record<string, ModelStatus>;
+  setModels(list: ModelStatus[]): void;
   lightbox: { items: LightboxItem[]; index: number } | null;
   openLightbox(items: LightboxItem[], index?: number): void;
   closeLightbox(): void;
@@ -127,6 +117,10 @@ export const useStore = create<State>((set, get) => ({
   editor: null,
   logOpen: false,
   credVersion: 0,
+  models: {},
+  setModels(list) {
+    set((s) => ({ models: { ...s.models, ...Object.fromEntries(list.map((m) => [m.id, m])) } }));
+  },
   singleRuns: {},
   view: "canvas",
   lightbox: null,
@@ -402,6 +396,15 @@ export const useStore = create<State>((set, get) => ({
       case "nodeType.changed":
         s.loadNodeTypes();
         break;
+      case "model.changed": {
+        const prev = s.models[e.model.id];
+        set({ models: { ...s.models, [e.model.id]: e.model } });
+        // Checks depend on which models are on disk.
+        if (wfId && prev?.downloaded !== e.model.downloaded) api.validate(wfId).then((issues) => get().workflow?.id === wfId && set({ issues }));
+        if (e.model.downloaded && prev && !prev.downloaded) s.notify("info", t("模型 {0} 下载完成，可以运行了", [e.model.name]));
+        else if (e.model.error && e.model.error !== prev?.error && e.model.error !== "cancelled") s.notify("error", t("模型 {0} 下载失败：{1}", [e.model.name, e.model.error]));
+        break;
+      }
       case "credentials.changed":
         set({ credVersion: s.credVersion + 1 });
         // Validation issues depend on which credentials exist.

@@ -1,0 +1,61 @@
+id: image.birefnet
+name: AI 抠图（BiRefNet）
+category: media
+description: >-
+  用开源模型 BiRefNet（MIT 协议，可商用）在本机抠图：照片、复杂背景、头发丝都能处理，输出透明 PNG 和黑白蒙版。
+  不联网、不按次收费。使用前在节点面板里点「下载模型」（轻量版约 224 MB，完整版约 973 MB），只需下载一次。
+  白底的设计图用「去白底」更快也更可控。
+inputs:
+  image:
+    type: file
+    description: 要抠图的图片（png / jpg / webp 等）
+params:
+  type: object
+  properties:
+    model:
+      type: string
+      enum: [birefnet-lite, birefnet]
+      default: birefnet-lite
+      description: birefnet-lite 速度快、约 224 MB；birefnet 边缘和细节更好，约 973 MB，更慢
+    threshold:
+      type: number
+      minimum: 0
+      maximum: 1
+      description: 硬边阈值（0–1）。不填保留柔和的半透明边缘（头发、毛发更自然）；填了以后蒙版只有全透明和不透明，比如 0.5
+outputs:
+  image:
+    type: file
+    description: 抠好的透明 PNG
+  mask:
+    type: file
+    description: 黑白蒙版（白色是保留的部分）
+models:
+  - id: birefnet-lite
+    name: BiRefNet lite
+    url: https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
+    size: 224
+  - id: birefnet
+    name: BiRefNet
+    url: https://huggingface.co/onnx-community/BiRefNet-ONNX/resolve/main/onnx/model.onnx
+    size: 973
+executor:
+  kind: script
+  language: js
+  file: image.birefnet.mjs
+timeout: 5m
+cache: true
+i18n:
+  en:
+    name: AI background removal (BiRefNet)
+    description: >-
+      Remove backgrounds locally with the open-source BiRefNet model (MIT, commercial use OK): photos, busy backgrounds and hair
+      all work; outputs a transparent PNG and a black-and-white mask. Offline, no per-image cost. Download the model once from the node's panel
+      first (lite about 224 MB, full about 973 MB). For designs on white, "Remove white background" is faster and more controllable.
+    inputs:
+      image: The image (png / jpg / webp…)
+    params:
+      model: birefnet-lite is fast (~224 MB); birefnet has better edges and detail (~973 MB) but is slower
+      threshold: Hard-edge cutoff (0–1). Empty keeps soft, semi-transparent edges (better for hair and fur); set e.g. 0.5 for fully opaque or fully transparent only
+    outputs:
+      image: The cut-out as a transparent PNG
+      mask: Black-and-white mask (white is kept)
