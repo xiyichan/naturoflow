@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fileUrl, type NodePreview } from "./api.ts";
 import { useStore } from "./store.ts";
-import { t } from "./i18n.ts";
+import { formatDateTime, formatWhen, t } from "./i18n.ts";
 
 type FileRef = { $file: true; path: string; size: number; mime: string };
 const isFile = (v: unknown): v is FileRef => !!v && typeof v === "object" && (v as FileRef).$file === true;
@@ -62,10 +62,7 @@ function summary(outputs: Record<string, unknown>): string {
   return `${Object.keys(outputs).length > 1 ? `${k}: ` : ""}${text ?? ""}`.slice(0, 160);
 }
 
-function when(ts: number) {
-  const d = new Date(ts);
-  return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString() : d.toLocaleString();
-}
+const when = formatWhen;
 
 /**
  * Results on a node card: the chosen (pinned) or latest result, ‹ › to flip through earlier ones,
@@ -146,7 +143,7 @@ export function NodeResults({ nodeId, previews, pinnedRunId }: { nodeId: string;
         <button disabled={i >= previews.length - 1} onClick={() => setI(i + 1)} aria-label={t("更早的结果")} title={t("更早的结果")}>
           ‹
         </button>
-        <span className="nf-res__pos" title={new Date(cur.at).toLocaleString()}>
+        <span className="nf-res__pos" title={formatDateTime(cur.at)}>
           {previews.length > 1 ? `${i + 1}/${previews.length}　` : ""}
           {when(cur.at)}
         </span>
@@ -202,7 +199,7 @@ function HistoryStrip({
             aria-selected={idx === current}
             data-current={idx === current || undefined}
             data-pinned={p.runId === pinnedRunId || undefined}
-            title={`${new Date(p.at).toLocaleString()}${p.runId === pinnedRunId ? t("（已选用）") : ""}`}
+            title={`${formatDateTime(p.at)}${p.runId === pinnedRunId ? t("（已选用）") : ""}`}
             onClick={() => onPick(idx)}
           >
             {m && !m.mime.startsWith("video/") ? (

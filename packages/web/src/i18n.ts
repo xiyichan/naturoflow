@@ -16,6 +16,34 @@ function detect(): Lang {
 }
 
 export const lang: Lang = detect();
+/** BCP 47 locale for dates and numbers, so they follow the interface language, not the browser's. */
+export const locale = lang === "zh" ? "zh-CN" : "en-US";
+
+const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "medium" });
+const timeOnly = new Intl.DateTimeFormat(locale, { timeStyle: "medium" });
+
+export function formatDateTime(ts: number | string | Date): string {
+  return dateTime.format(new Date(ts));
+}
+
+export function formatTime(ts: number | string | Date): string {
+  return timeOnly.format(new Date(ts));
+}
+
+const shortTimeFmt = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
+const shortDayFmt = new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** Compact, for lists: "1:10 AM" today, "10/23, 1:10 AM" otherwise. */
+export function formatShort(ts: number | string | Date): string {
+  const d = new Date(ts);
+  return (d.toDateString() === new Date().toDateString() ? shortTimeFmt : shortDayFmt).format(d);
+}
+
+/** Time only for today, date and time otherwise. */
+export function formatWhen(ts: number | string | Date): string {
+  const d = new Date(ts);
+  return d.toDateString() === new Date().toDateString() ? timeOnly.format(d) : dateTime.format(d);
+}
 document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
 
 /** Switch language; the page reloads so every label (including module-level ones) updates. */

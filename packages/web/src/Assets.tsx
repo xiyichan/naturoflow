@@ -3,6 +3,8 @@ import { api, fileUrl, type Artifact, type UploadedFile } from "./api.ts";
 import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
 import { t } from "./i18n.ts";
+import { Empty } from "./Empty.tsx";
+import { IconPhoto, IconStar } from "./icons.tsx";
 
 /** Drag payload for a file going onto the canvas. */
 export const DND_FILE = "application/x-naturoflow-file";
@@ -141,9 +143,9 @@ export function Assets({ onAdd }: { onAdd: (files: DraggedFile[]) => void }) {
       </div>
 
       {items && items.length === 0 ? (
-        <p className="nf-muted nf-assets__empty">
-          {scope === "uploads" ? t("还没有上传过文件。") : starred ? t("没有标星的文件。") : t("还没有生成过文件。")}
-        </p>
+        <Empty compact icon={starred ? <IconStar /> : <IconPhoto />} title={scope === "uploads" ? t("还没有上传过文件") : starred ? t("没有标星的文件") : t("还没有生成过文件")}>
+          {scope === "uploads" ? t("点「上传文件」，或者把电脑里的文件拖进来。") : starred ? t("在生成结果里给喜欢的文件标星，它们会出现在这里。") : t("运行工作流后，生成的图片、视频、音频会出现在这里。")}
+        </Empty>
       ) : (
         <ul className="nf-assets__grid nf-masonry">
           {items?.map((it) => (

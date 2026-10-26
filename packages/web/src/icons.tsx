@@ -61,3 +61,32 @@ export const IconKeyboard = (p: P) => (
     <path d="M4.2 6.6h.01M6.7 6.6h.01M9.3 6.6h.01M11.8 6.6h.01M4.2 9.4h.01M11.8 9.4h.01M6.4 9.4h3.2" strokeWidth={1.6} />
   </svg>
 );
+
+export const IconFlow = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="1.5" y="2.5" width="5" height="4" rx="1" />
+    <rect x="9.5" y="9.5" width="5" height="4" rx="1" />
+    <path d="M6.5 4.5h2.2a1.5 1.5 0 0 1 1.5 1.5v3.5" />
+  </svg>
+);
+
+export const IconPhoto = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.8" />
+    <circle cx="5.6" cy="6.3" r="1.1" />
+    <path d="m2.2 11.6 3.6-3.4 2.6 2.4 2.2-2 3.2 3" />
+  </svg>
+);
+
+export const IconClock = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="8" cy="8" r="6.2" />
+    <path d="M8 4.6V8l2.3 1.5" />
+  </svg>
+);
+
+export const IconStar = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="m8 2 1.8 3.8 4.1.5-3 2.8.8 4.1L8 11.2l-3.7 2 .8-4.1-3-2.8 4.1-.5Z" />
+  </svg>
+);

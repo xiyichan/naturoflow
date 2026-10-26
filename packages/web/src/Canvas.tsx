@@ -26,6 +26,8 @@ import { portCompatible, typeColor } from "./ports.ts";
 import { Shortcuts } from "./Shortcuts.tsx";
 import { useStore } from "./store.ts";
 import { issueText, t } from "./i18n.ts";
+import { Empty } from "./Empty.tsx";
+import { IconFlow } from "./icons.tsx";
 
 const nodeTypes = { nf: FlowNode };
 const edgeTypes = { cable: CableEdge };
@@ -320,10 +322,23 @@ export function Canvas() {
 
   if (!workflow) {
     return (
-      <div className="nf-empty">
-        <p>{t("还没有打开的工作流。")}</p>
-        <p>{t("在顶栏新建一个，或者让 AI 通过 MCP 调用")} <code>create_workflow</code>{t("，它会马上出现在这里。")}</p>
-      </div>
+      <Empty
+        icon={<IconFlow />}
+        title={t("还没有打开的工作流")}
+        action={
+          <button
+            className="nf-btn nf-btn--primary"
+            onClick={() => {
+              const name = prompt(t("新工作流的名称"));
+              if (name?.trim()) useStore.getState().createWorkflow(name.trim());
+            }}
+          >
+            {t("新建工作流")}
+          </button>
+        }
+      >
+        {t("新建一个，或者让 AI 通过 MCP 调用")} <code>create_workflow</code>{t("，它会马上出现在这里。")}
+      </Empty>
     );
   }
 

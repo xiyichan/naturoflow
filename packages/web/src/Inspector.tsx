@@ -12,7 +12,9 @@ import { CredentialPicker } from "./CredentialPicker.tsx";
 import { ParamForm } from "./ParamForm.tsx";
 import { typeColor, typeLabel } from "./ports.ts";
 import { useStore } from "./store.ts";
-import { issueText, t } from "./i18n.ts";
+import { formatDateTime, formatShort, formatTime, issueText, t } from "./i18n.ts";
+import { Empty } from "./Empty.tsx";
+import { IconClock } from "./icons.tsx";
 
 const STATUS_TEXT: Record<string, string> = {
   pending: t("等待中"),
@@ -335,7 +337,11 @@ function WorkflowPanel() {
           <ul className="nf-runs">
             {runs.map((r) => (
               <li key={r.id}>
-                <button aria-current={r.id === run?.id || undefined} onClick={() => showRun(r.id)}>
+                <button
+                  aria-current={r.id === run?.id || undefined}
+                  onClick={() => showRun(r.id)}
+                  title={[formatDateTime(r.startedAt), r.single && `${t("单独运行")} ${r.single.nodeId}`, r.rerunOf && t("从 {0} 重跑", [r.rerunOf.fromNode]), STATUS_TEXT[r.status]].filter(Boolean).join(t("，"))}
+                >
                   <span className="nf-dot" data-status={r.status} />
                   <span className="nf-runs__time">{shortTime(r.startedAt)}</span>
                   {r.rerunOf && <span className="nf-tag">{t("从 {0} 重跑", [r.rerunOf.fromNode])}</span>}
@@ -499,7 +505,12 @@ function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
   };
 
   if (!items) return <p className="nf-muted">{t("加载中…")}</p>;
-  if (!items.length) return <p className="nf-muted">{t("这个节点还没有执行过。运行工作流后，每次的请求和结果都会记录在这里。")}</p>;
+  if (!items.length)
+    return (
+      <Empty compact icon={<IconClock />} title={t("这个节点还没有执行过")}>
+        {t("运行工作流后，每次的请求和结果都会记录在这里。")}
+      </Empty>
+    );
 
   return (
     <ol className="nf-hist">
@@ -511,7 +522,7 @@ function NodeHistory({ nodeId, onRan }: { nodeId: string; onRan: () => void }) {
           <li key={h.runId} data-open={isOpen || undefined}>
             <button className="nf-hist__row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : h.runId)}>
               <span className="nf-dot" data-status={n.status} />
-              <span className="nf-hist__time">{new Date(n.startedAt ?? h.runStartedAt).toLocaleString()}</span>
+              <span className="nf-hist__time">{formatDateTime(n.startedAt ?? h.runStartedAt)}</span>
               {n.cached && <span className="nf-tag">{n.cached === "cache" ? t("缓存") : t("沿用")}</span>}
               {h.rerunOf && <span className="nf-tag">{t("重跑")}</span>}
               {h.single && <span className="nf-tag">{t("单独运行")}</span>}
@@ -681,7 +692,7 @@ function SingleRunBox({ node, def, beforeRun }: { node: WorkflowNode; def: NodeT
       {nr && (
         <div className="nf-single__result">
           <p className="nf-muted">
-            {t("{0} 的单独运行", [new Date(single.startedAt).toLocaleString()])}
+            {t("{0} 的单独运行", [formatDateTime(single.startedAt)])}
             {single.single?.fromRunId ? t("（输入来自之前的一次运行）") : ""}
           </p>
           <RunDetail run={nr} nodeId={node.id} single />
@@ -691,9 +702,4 @@ function SingleRunBox({ node, def, beforeRun }: { node: WorkflowNode; def: NodeT
   );
 }
 
-/** Today: time only; otherwise month/day and time. */
-function shortTime(ts: number) {
-  const d = new Date(ts);
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  return d.toDateString() === new Date().toDateString() ? time : `${d.getMonth() + 1}/${d.getDate()} ${time}`;
-}
+const shortTime = formatShort;

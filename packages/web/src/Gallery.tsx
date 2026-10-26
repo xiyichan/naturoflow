@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, fileUrl, type Artifact } from "./api.ts";
 import { MasonryItem } from "./Masonry.tsx";
 import { useStore } from "./store.ts";
-import { t } from "./i18n.ts";
+import { formatDateTime, formatWhen, t } from "./i18n.ts";
+import { Empty } from "./Empty.tsx";
+import { IconPhoto } from "./icons.tsx";
 
 const KINDS: { label: string; mime?: string }[] = [
   { label: t("全部") },
@@ -11,12 +13,7 @@ const KINDS: { label: string; mime?: string }[] = [
   { label: t("音频"), mime: "audio/" },
 ];
 
-function when(ts: number) {
-  const d = new Date(ts);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  return sameDay ? d.toLocaleTimeString() : d.toLocaleString();
-}
+const when = formatWhen;
 
 function sizeOf(n: number) {
   return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`;
@@ -33,7 +30,7 @@ function headline(a: Artifact) {
 }
 
 function toLightbox(a: Artifact) {
-  return { path: a.path, mime: a.mime, title: headline(a) || undefined, sub: `${a.nodeLabel || a.nodeId}${t("，")}${new Date(a.createdAt).toLocaleString()}${a.note ? `，${a.note}` : ""}` };
+  return { path: a.path, mime: a.mime, title: headline(a) || undefined, sub: `${a.nodeLabel || a.nodeId}${t("，")}${formatDateTime(a.createdAt)}${a.note ? `，${a.note}` : ""}` };
 }
 
 /** Own params plus upstream params as "node.param", for comparing whole chains. */
@@ -91,7 +88,7 @@ export function Gallery() {
   const togglePick = (path: string) =>
     setPicked((p) => (p.includes(path) ? p.filter((x) => x !== path) : p.length >= 4 ? [...p.slice(1), path] : [...p, path]));
 
-  if (!workflow) return <div className="nf-empty"><p>{t("先打开一个工作流。")}</p></div>;
+  if (!workflow) return <Empty icon={<IconPhoto />} title={t("先打开一个工作流")} />;
   const current = items?.find((a) => a.path === selected);
   const pickedItems = picked.map((p) => items?.find((a) => a.path === p)).filter(Boolean) as Artifact[];
 
@@ -134,10 +131,28 @@ export function Gallery() {
         </div>
 
         {items && items.length === 0 ? (
-          <div className="nf-empty">
-            <p>{starredOnly || nodeId || kind ? t("没有符合筛选条件的文件。") : t("这个工作流还没有生成过文件。")}</p>
-            <p>{t("运行后，生成的图片、视频、音频都会出现在这里，最新的在最前面。")}</p>
-          </div>
+          starredOnly || nodeId || kind ? (
+            <Empty
+              icon={<IconPhoto />}
+              title={t("没有符合筛选条件的文件")}
+              action={
+                <button
+                  className="nf-btn"
+                  onClick={() => {
+                    setStarredOnly(false);
+                    setNodeId("");
+                    setKind(0);
+                  }}
+                >
+                  {t("清除筛选")}
+                </button>
+              }
+            />
+          ) : (
+            <Empty icon={<IconPhoto />} title={t("这个工作流还没有生成过文件")}>
+              {t("运行后，生成的图片、视频、音频都会出现在这里，最新的在最前面。")}
+            </Empty>
+          )
         ) : (
           <ul className="nf-gal__grid nf-masonry">
             {items?.map((a) => (
@@ -248,7 +263,7 @@ function Detail({ a, onMark }: { a: Artifact; onMark: (m: Partial<Pick<Artifact,
           </dd>
           <dt>{t("生成时间")}</dt>
           <dd>
-            {new Date(a.createdAt).toLocaleString()}
+            {formatDateTime(a.createdAt)}
             {a.single && <span className="nf-tag">{t("单独运行")}</span>}
             {a.rerunOf && <span className="nf-tag">{t("重跑")}</span>}
           </dd>
