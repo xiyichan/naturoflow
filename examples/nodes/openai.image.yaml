@@ -1,0 +1,162 @@
+id: openai.image
+name: GPT Image 生成 / 改图
+category: ai
+description: >-
+  OpenAI 图片接口（gpt-image 系列）。没有参考图时调用 /images/generations 生成；
+  接了参考图时调用 /images/edits 改图或合成（最多 16 张，可选蒙版 mask 指定要改的区域）。
+  返回的图片保存为本地文件。兼容 OpenAI 格式的代理也能用，只发送设置过的参数。
+credentials:
+  type: openai
+  name: OpenAI
+  fields:
+    api_key:
+      label: API Key
+      description: 以 Authorization Bearer 请求头发送
+    base_url:
+      label: 接口地址
+      secret: false
+      required: false
+      description: 留空使用官方 https://api.openai.com/v1；用代理或中转时填它的地址（到 /v1 为止）
+inputs:
+  image:
+    type: any
+    required: false
+    description: 参考图 1。接上任意参考图就会走改图接口（/images/edits）。本地文件、URL，或它们的列表
+  image_2:
+    type: any
+    required: false
+    description: 参考图 2
+  image_3:
+    type: any
+    required: false
+    description: 参考图 3
+  image_4:
+    type: any
+    required: false
+    description: 参考图 4
+  mask:
+    type: any
+    required: false
+    description: 蒙版（PNG，透明的地方是要改的区域，尺寸要和第一张参考图一致）。只用于改图
+  prompt:
+    type: string
+    required: false
+    description: 接上时代替参数里的提示词
+params:
+  type: object
+  required: [model]
+  properties:
+    prompt:
+      type: string
+      format: multiline
+      description: 提示词。改图时描述要怎么改
+    model:
+      type: string
+      default: gpt-image-1
+      description: 模型名，例如 gpt-image-1；代理按它的文档填
+    mode:
+      type: string
+      enum: [auto, generate, edit]
+      default: auto
+      description: auto：有参考图就改图，没有就生成。也可以固定用某个接口
+    image:
+      type: string
+      format: multiline
+      description: 额外的参考图 URL 或本地文件路径，每行一张，排在端口传入的图之后
+    "n":
+      type: integer
+      minimum: 1
+      maximum: 10
+      description: 生成几张
+    size:
+      type: string
+      enum: [auto, 1024x1024, 1536x1024, 1024x1536]
+      description: 尺寸。不填用接口默认（auto）；代理支持的其他尺寸可以在 YAML 里改
+    quality:
+      type: string
+      enum: [auto, low, medium, high]
+      description: 质量，越高越慢越贵
+    background:
+      type: string
+      enum: [auto, transparent, opaque]
+      description: transparent 生成透明背景（需要 png 或 webp 格式）
+    output_format:
+      type: string
+      enum: [png, jpeg, webp]
+      description: 输出格式，不填为 png
+    output_compression:
+      type: integer
+      minimum: 0
+      maximum: 100
+      description: jpeg / webp 的压缩率（0–100）
+    input_fidelity:
+      type: string
+      enum: [low, high]
+      description: 改图时对参考图细节（比如人脸、logo）的保留程度。只用于改图
+    moderation:
+      type: string
+      enum: [auto, low]
+      description: 内容审核强度。只用于生成
+    extra:
+      type: object
+      description: 其他要原样发送的字段（JSON），比如代理特有的参数
+outputs:
+  file:
+    type: file
+    required: false
+    description: 第一张图片
+  files:
+    type: list<file>
+    description: 全部图片
+  revised_prompt:
+    type: string
+    required: false
+    description: 接口改写后的提示词（有的模型会返回）
+  usage:
+    type: json
+    required: false
+executor:
+  kind: script
+  language: js
+  file: openai.image.mjs
+# Billed per call, so never retried automatically.
+timeout: 10m
+i18n:
+  en:
+    name: GPT Image generate / edit
+    description: >-
+      OpenAI's image API (gpt-image models). Without reference images it calls /images/generations;
+      with them it calls /images/edits to edit or combine (up to 16, with an optional mask for the area to change).
+      Images are saved as local files. Works with OpenAI-compatible proxies; only params you set are sent.
+    credentials:
+      fields:
+        api_key:
+          description: Sent as an Authorization Bearer header
+        base_url:
+          label: Base URL
+          description: Leave empty for https://api.openai.com/v1; set your proxy's address otherwise (up to /v1)
+    inputs:
+      image: Reference image 1. Any reference image switches to the edit endpoint (/images/edits). A local file, a URL, or a list
+      image_2: Reference image 2
+      image_3: Reference image 3
+      image_4: Reference image 4
+      mask: Mask (PNG; transparent areas are the ones to change, same size as the first reference). Edits only
+      prompt: When connected, used instead of the prompt param
+    params:
+      prompt: The prompt. For edits, describe the change
+      model: Model name, e.g. gpt-image-1; for a proxy, see its docs
+      mode: "auto: edit when there are reference images, generate otherwise. Or force one endpoint"
+      image: Extra reference image URLs or local paths, one per line, after the images from ports
+      "n": How many images
+      size: Size. Empty uses the API default (auto); edit the YAML for other sizes a proxy supports
+      quality: Quality; higher is slower and costs more
+      background: transparent makes a transparent background (needs png or webp)
+      output_format: Output format; png when empty
+      output_compression: Compression for jpeg / webp (0–100)
+      input_fidelity: How closely edits keep details of the references (faces, logos). Edits only
+      moderation: Moderation strictness. Generation only
+      extra: Other fields to send as-is (JSON), e.g. proxy-specific options
+    outputs:
+      file: The first image
+      files: All images
+      revised_prompt: The prompt as rewritten by the API (some models return it)
