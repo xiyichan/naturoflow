@@ -1,0 +1,82 @@
+id: image.remove-white
+name: 去白底
+category: media
+description: >-
+  把图片的白色背景变透明，输出带透明通道的 PNG。和图片边缘连在一起的白色（真正的背景）用「容差」去掉；
+  被图案包围的白色（字母缝隙、眼白、高光）只去掉接近纯白的部分，由「内部容差」控制，眼白这类偏色的白会保留。
+  适合白底插画、印花图案；照片或背景和主体颜色接近的图效果有限。
+inputs:
+  image:
+    type: file
+    description: 白底图片（png / jpg / webp 等）
+params:
+  type: object
+  properties:
+    tolerance:
+      type: number
+      default: 0.12
+      minimum: 0.001
+      maximum: 0.6
+      description: 背景容差：多接近白色就算背景。背景边缘残留白边就调大（如 0.15～0.2），主体浅色部分被抠掉就调小
+    softness:
+      type: number
+      default: 0.08
+      minimum: 0
+      maximum: 0.5
+      description: 边缘柔化：背景和主体交界处的半透明过渡宽度，0 为硬边
+    inner_tolerance:
+      type: number
+      default: 0.012
+      minimum: 0.001
+      maximum: 0.6
+      description: 内部容差：被图案包围的白色区域多接近纯白才去掉。眼白、高光出现斑点就调小；字母缝隙里还有白色就调大（如 0.02）；调到 0.001 基本保留所有被包围的白色
+    white_threshold:
+      type: integer
+      default: 225
+      minimum: 0
+      maximum: 255
+      description: 背景亮度阈值（0–255）：亮度高于它的像素才算背景、用来判断哪些白色和边缘连通。背景偏灰时调低（如 210）
+    seed_x:
+      type: integer
+      default: 0
+      minimum: 0
+      description: 背景起点 X：从这个点开始找相连的背景。默认左上角，左上角不是背景时改成背景上任意一点
+    seed_y:
+      type: integer
+      default: 0
+      minimum: 0
+      description: 背景起点 Y
+outputs:
+  image:
+    type: file
+    description: 透明背景的 PNG
+executor:
+  kind: command
+  bin: ffmpeg
+  args: ["-y", "-hide_banner", "-loglevel", "error", "-i", "{{inputs.image}}",
+         "-filter_complex",
+         "[0]split=4[m][k][t][c];[m]format=gray,lut=y='if(gt(val,{{params.white_threshold}}),255,0)',floodfill=x={{params.seed_x}}:y={{params.seed_y}}:s0=255:d0=128,lut=y='if(eq(val,128),255,0)',dilation,dilation[reach];[k]format=rgba,colorkey=white:{{params.tolerance}}:{{params.softness}},alphaextract,format=gray[loose];[t]format=rgba,colorkey=white:{{params.inner_tolerance}}:{{params.inner_tolerance}},alphaextract,format=gray[tight];[reach][loose]blend=all_expr='if(gt(A,128),B,255)'[outer];[outer][tight]blend=all_expr='min(A,B)'[alpha];[c]format=rgba[rgb];[rgb][alpha]alphamerge",
+         "-frames:v", "1", "{{ctx.outDir}}/transparent.png"]
+  outputs:
+    image: "{{ctx.outDir}}/transparent.png"
+timeout: 2m
+cache: true
+i18n:
+  en:
+    name: Remove white background
+    description: >-
+      Make a white background transparent and output a PNG with alpha. White connected to the image's edge (the real background)
+      is removed using the tolerance; white enclosed by the design (gaps in lettering, eye whites, highlights) only when it's
+      near pure white, set by the inner tolerance, so tinted whites like eyes stay. Best for illustrations and print designs on white;
+      photos or backgrounds close to the subject's colors won't come out clean.
+    inputs:
+      image: An image on white (png / jpg / webp…)
+    params:
+      tolerance: How close to white counts as background. Raise it (0.15–0.2) if a white fringe remains; lower it if light parts of the subject disappear
+      softness: Width of the semi-transparent transition at the edge; 0 for hard edges
+      inner_tolerance: How close to pure white enclosed areas must be to be removed. Lower it if eye whites or highlights get speckled; raise it (e.g. 0.02) if white remains in gaps; 0.001 keeps almost all enclosed white
+      white_threshold: Brightness (0–255) above which a pixel counts as background when finding what connects to the edge. Lower it (e.g. 210) for an off-white background
+      seed_x: Where the background search starts (x). Top-left by default; move it onto the background if that corner isn't background
+      seed_y: Where the background search starts (y)
+    outputs:
+      image: PNG with a transparent background
