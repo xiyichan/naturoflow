@@ -38,6 +38,9 @@ function localizedNames(def: { i18n?: Record<string, { credentials?: { name?: st
   );
 }
 
+/** Credential type holding the Hugging Face access token for gated model downloads. */
+export const HF_CREDENTIAL = "huggingface";
+
 /** A workflow's callable interface, derived from its core.input / core.output nodes. */
 export interface WorkflowInterface {
   inputs: { key: string; type: string; description?: string; required: boolean; default?: unknown }[];
@@ -521,6 +524,7 @@ export class NaturoflowService extends EventEmitter {
       (model) => {
         this.emit("event", { type: "model.changed", model } satisfies ServiceEvent);
       },
+      () => this.hfToken(),
     ));
   }
 
@@ -579,7 +583,17 @@ export class NaturoflowService extends EventEmitter {
     for (const { def } of this.registry.list()) {
       if (credentialTypeOf(def) === type) return { type, name: def.credentials!.name ?? type, fields: def.credentials!.fields };
     }
+    // Built in: the Hugging Face token used to download gated models.
+    if (type === HF_CREDENTIAL) {
+      return { type, name: "Hugging Face", fields: { token: { label: "Access token", secret: true, required: true, description: "huggingface.co/settings/tokens (read access is enough)" } } };
+    }
     return undefined;
+  }
+
+  /** The newest saved Hugging Face token. */
+  private hfToken(): string | undefined {
+    const c = this.store.listCredentials(HF_CREDENTIAL).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    return c ? this.resolveCredential(c.id)?.data.token : undefined;
   }
 
   listCredentials(type?: string): CredentialInfo[] {

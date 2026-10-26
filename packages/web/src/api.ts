@@ -58,14 +58,22 @@ export interface CredentialInfo {
   updatedAt: number;
 }
 
-export interface ModelSpec {
+interface ModelLicense {
+  license?: string;
+  licenseUrl?: string;
+  commercial?: boolean;
+  gated?: boolean;
+  page?: string;
+}
+
+export interface ModelSpec extends ModelLicense {
   id: string;
   name?: string;
   url: string;
   size?: number;
 }
 
-export interface ModelStatus {
+export interface ModelStatus extends ModelLicense {
   id: string;
   name: string;
   url: string;

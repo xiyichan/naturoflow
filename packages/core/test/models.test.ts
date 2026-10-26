@@ -12,9 +12,15 @@ let svc: NaturoflowService;
 let server: http.Server;
 let base: string;
 let hold: (() => void) | undefined;
+const authSeen: (string | undefined)[] = [];
 
 beforeAll(async () => {
   server = http.createServer((req, res) => {
+    if (req.url?.startsWith("/gated/")) {
+      authSeen.push(req.headers.authorization);
+      if (req.headers.authorization !== "Bearer hf_test") return res.writeHead(401).end("unauthorized");
+      return res.writeHead(200, { "content-length": String(BYTES.length) }).end(BYTES);
+    }
     if (req.url === "/ok/model.onnx" || req.url === "/x/resolve/main/model.onnx") return res.writeHead(200, { "content-length": String(BYTES.length) }).end(BYTES);
     if (req.url === "/short/model.onnx") {
       res.writeHead(200, { "content-length": String(BYTES.length) });
@@ -42,6 +48,8 @@ beforeAll(async () => {
       { id: "m-short", url: `${base}/short/model.onnx` },
       { id: "m-slow", url: `${base}/slow/model.onnx` },
       { id: "m-hf", url: "https://huggingface.co/x/resolve/main/model.onnx" },
+      { id: "m-gated", url: `${base}/gated/model.onnx`, gated: true, page: "https://huggingface.co/acme/gated", license: "CC BY-NC 4.0", commercial: false },
+      { id: "m-hf-gated", url: "https://huggingface.co/gated/model.onnx", gated: true },
     ],
     executor: { kind: "script", language: "js", code: "export default async ({ ctx }) => ({ dir: ctx.modelsDir });" },
   });
@@ -97,5 +105,27 @@ describe("models", () => {
     expect(st.downloaded).toBe(true);
     expect(svc.models.remove("m-hf").downloaded).toBe(false);
     expect(() => svc.models.download("nope")).toThrow(/no node type declares a model "nope"/);
+  });
+
+  it("needs a saved Hugging Face token for gated models, sends it only to the model's host", async () => {
+    expect(svc.models.status("m-gated")).toMatchObject({ gated: true, license: "CC BY-NC 4.0", commercial: false });
+    const noToken = await svc.models.download("m-gated").done;
+    expect(noToken.error).toContain("needs a Hugging Face access token");
+    expect(authSeen).toEqual([]);
+
+    // The token is a built-in credential type, stored encrypted like the rest.
+    const cred = svc.createCredential({ type: "huggingface", name: "HF", data: { token: "hf_wrong" } });
+    const refused = await svc.models.download("m-gated").done;
+    expect(refused.error).toContain("Hugging Face refused the download (HTTP 401)");
+    expect(refused.error).toContain("https://huggingface.co/acme/gated");
+
+    svc.updateCredential(cred.id, { data: { token: "hf_test" } });
+    expect((await svc.models.download("m-gated").done).downloaded).toBe(true);
+    expect(authSeen).toEqual(["Bearer hf_wrong", "Bearer hf_test"]);
+
+    // Through a mirror the token stays home.
+    const viaMirror = await svc.models.download("m-hf-gated", { mirror: base }).done;
+    expect(authSeen.at(-1)).toBeUndefined();
+    expect(viaMirror.error).toContain("tokens aren't sent to mirrors");
   });
 });

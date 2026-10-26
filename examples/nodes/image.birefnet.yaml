@@ -1,9 +1,11 @@
 id: image.birefnet
-name: AI 抠图（BiRefNet）
+name: AI 抠图（BiRefNet / RMBG）
 category: media
 description: >-
   用开源模型 BiRefNet（MIT 协议，可商用）在本机抠图：照片、复杂背景、头发丝都能处理，输出透明 PNG 和黑白蒙版。
   不联网、不按次收费。使用前在节点面板里点「下载模型」（轻量版约 224 MB，完整版约 973 MB），只需下载一次。
+  也可以选 BRIA 的 RMBG-2.0：注意它是 CC BY-NC 4.0 协议，仅限非商业用途（商用要和 BRIA 另签授权），
+  下载需要 Hugging Face 账号先在模型页同意条款，并在模型面板里保存 access token。
   白底的设计图用「去白底」更快也更可控。
 inputs:
   image:
@@ -14,9 +16,11 @@ params:
   properties:
     model:
       type: string
-      enum: [birefnet-lite, birefnet]
+      enum: [birefnet-lite, birefnet, rmbg-2.0, rmbg-2.0-int8]
       default: birefnet-lite
-      description: birefnet-lite 速度快、约 224 MB；birefnet 边缘和细节更好，约 973 MB，更慢
+      description: >-
+        birefnet-lite 速度快、约 224 MB；birefnet 边缘和细节更好，约 973 MB，更慢（两者 MIT 协议，可商用）。
+        rmbg-2.0（约 1 GB）和 rmbg-2.0-int8（量化版，约 366 MB，更快）为 CC BY-NC 4.0，仅限非商用
     threshold:
       type: number
       minimum: 0
@@ -34,10 +38,34 @@ models:
     name: BiRefNet lite
     url: https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
     size: 224
+    license: MIT
+    licenseUrl: https://huggingface.co/ZhengPeng7/BiRefNet_lite
+    commercial: true
   - id: birefnet
     name: BiRefNet
     url: https://huggingface.co/onnx-community/BiRefNet-ONNX/resolve/main/onnx/model.onnx
     size: 973
+    license: MIT
+    licenseUrl: https://huggingface.co/ZhengPeng7/BiRefNet
+    commercial: true
+  - id: rmbg-2.0
+    name: RMBG-2.0
+    url: https://huggingface.co/briaai/RMBG-2.0/resolve/main/onnx/model.onnx
+    size: 1024
+    license: CC BY-NC 4.0
+    licenseUrl: https://creativecommons.org/licenses/by-nc/4.0/
+    commercial: false
+    gated: true
+    page: https://huggingface.co/briaai/RMBG-2.0
+  - id: rmbg-2.0-int8
+    name: RMBG-2.0 int8
+    url: https://huggingface.co/briaai/RMBG-2.0/resolve/main/onnx/model_int8.onnx
+    size: 366
+    license: CC BY-NC 4.0
+    licenseUrl: https://creativecommons.org/licenses/by-nc/4.0/
+    commercial: false
+    gated: true
+    page: https://huggingface.co/briaai/RMBG-2.0
 executor:
   kind: script
   language: js
@@ -46,15 +74,19 @@ timeout: 5m
 cache: true
 i18n:
   en:
-    name: AI background removal (BiRefNet)
+    name: AI background removal (BiRefNet / RMBG)
     description: >-
       Remove backgrounds locally with the open-source BiRefNet model (MIT, commercial use OK): photos, busy backgrounds and hair
       all work; outputs a transparent PNG and a black-and-white mask. Offline, no per-image cost. Download the model once from the node's panel
-      first (lite about 224 MB, full about 973 MB). For designs on white, "Remove white background" is faster and more controllable.
+      first (lite about 224 MB, full about 973 MB). BRIA's RMBG-2.0 is also available: it's CC BY-NC 4.0, non-commercial use only
+      (commercial use needs a separate BRIA license), and downloading needs a Hugging Face account that accepted its terms plus an
+      access token saved in the model panel. For designs on white, "Remove white background" is faster and more controllable.
     inputs:
       image: The image (png / jpg / webp…)
     params:
-      model: birefnet-lite is fast (~224 MB); birefnet has better edges and detail (~973 MB) but is slower
+      model: >-
+        birefnet-lite is fast (~224 MB); birefnet has better edges and detail (~973 MB) but is slower (both MIT, commercial use OK).
+        rmbg-2.0 (~1 GB) and rmbg-2.0-int8 (quantized, ~366 MB, faster) are CC BY-NC 4.0, non-commercial only
       threshold: Hard-edge cutoff (0–1). Empty keeps soft, semi-transparent edges (better for hair and fur); set e.g. 0.5 for fully opaque or fully transparent only
     outputs:
       image: The cut-out as a transparent PNG

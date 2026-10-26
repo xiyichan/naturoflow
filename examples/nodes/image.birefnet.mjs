@@ -1,4 +1,4 @@
-// Background removal with BiRefNet (MIT), run locally through onnxruntime.
+// Background removal with BiRefNet (MIT) or RMBG-2.0 (BiRefNet-based, CC BY-NC), run locally through onnxruntime.
 // The models are declared in the YAML and downloaded from the node's panel into ctx.modelsDir.
 import fs from "node:fs";
 import path from "node:path";

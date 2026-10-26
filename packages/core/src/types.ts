@@ -136,6 +136,15 @@ export const ModelSpec = z.object({
   url: z.string().url(),
   /** Approximate size in MB, shown before downloading. */
   size: z.number().optional(),
+  /** License name shown next to the model, e.g. "MIT" or "CC BY-NC 4.0". */
+  license: z.string().optional(),
+  licenseUrl: z.string().url().optional(),
+  /** false: the license doesn't allow commercial use (the UI says so). */
+  commercial: z.boolean().optional(),
+  /** Hugging Face "gated" repo: downloading needs an access token from an account that accepted its terms. */
+  gated: z.boolean().optional(),
+  /** Page to accept the terms on (for gated models). */
+  page: z.string().url().optional(),
 });
 export type ModelSpec = z.infer<typeof ModelSpec>;
 

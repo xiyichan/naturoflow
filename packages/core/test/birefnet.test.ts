@@ -30,7 +30,8 @@ describe("image.birefnet", () => {
   it("asks for the model to be downloaded instead of fetching it mid-run", async () => {
     const wf = { id: "b", name: "b", nodes: [{ id: "cut", type: "image.birefnet", params: { model: "birefnet" } }] };
     expect(svc.validateWorkflow(wf).find((i) => i.code === "MISSING_MODEL")?.args).toMatchObject({ model: "birefnet", size: 973 });
-    expect(svc.models.list("image.birefnet").map((m) => m.id)).toEqual(["birefnet-lite", "birefnet"]);
+    expect(svc.models.list("image.birefnet").map((m) => m.id)).toEqual(["birefnet-lite", "birefnet", "rmbg-2.0", "rmbg-2.0-int8"]);
+    expect(svc.models.status("rmbg-2.0")).toMatchObject({ commercial: false, gated: true, license: "CC BY-NC 4.0" });
     const n = (await run({})).nodes.node;
     expect(n.error).toContain(`model "birefnet-lite" isn't downloaded yet`);
   });

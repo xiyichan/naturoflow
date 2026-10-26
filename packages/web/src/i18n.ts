@@ -118,6 +118,18 @@ export function localizeDef<T extends { name: string; i18n?: Record<string, Node
   };
 }
 
+/** Model download errors from the server, in the interface language when we recognize them. */
+export function modelErrorText(err: string): string {
+  if (err === "cancelled") return t("已取消下载");
+  const refused = /^Hugging Face refused the download \(HTTP (\d+)\)/.exec(err);
+  if (refused) {
+    const page = /accept the terms at (\S+?),/.exec(err)?.[1];
+    return t("Hugging Face 拒绝了下载（HTTP {0}）：请确认已登录并在模型页面同意条款，再检查保存的 token 是否正确{1}", [refused[1], page ? t("。模型页面：{0}", [page]) : ""]) + (err.includes("mirrors") ? t("（使用镜像时不会发送 token）") : "");
+  }
+  if (err.startsWith("this model needs a Hugging Face access token")) return t("这个模型需要 Hugging Face token，先在模型面板里保存");
+  return t("下载失败：{0}", [err]);
+}
+
 /** What to fix by hand after importing a workflow. */
 export function importWarningText(w: { code: string; nodeId?: string; args: Record<string, string> }): string {
   switch (w.code) {

@@ -134,7 +134,14 @@ models:
     name: BiRefNet lite
     url: https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx
     size: 224                         # MB, shown before downloading
+    license: MIT                      # shown next to the model
+    licenseUrl: https://huggingface.co/ZhengPeng7/BiRefNet_lite
+    commercial: true                  # false: labelled "non-commercial only"
+    # gated: true                     # Hugging Face gated repo: needs the user's saved access token
+    # page: https://huggingface.co/<org>/<repo>   # where they accept the terms
 \`\`\`
+The Hugging Face token is a built-in credential type \`huggingface\` (field \`token\`); it is sent only
+to the model's own host, never to a mirror.
 
 ## Credentials
 Declare what a node needs instead of reading env vars; users save any number of credentials per type

@@ -18,6 +18,11 @@ export interface ModelStatus {
   error?: string;
   /** Node types that use this model. */
   nodeTypes: string[];
+  license?: string;
+  licenseUrl?: string;
+  commercial?: boolean;
+  gated?: boolean;
+  page?: string;
 }
 
 interface Job {
@@ -40,6 +45,8 @@ export class ModelManager {
     readonly dir: string,
     private specs: () => { spec: ModelSpec; nodeType: string }[],
     private emit: (status: ModelStatus) => void,
+    /** The saved Hugging Face access token, for gated models. */
+    private hfToken: () => string | undefined = () => undefined,
   ) {}
 
   /** Where a model lives on disk (whether or not it is there yet). */
@@ -70,6 +77,11 @@ export class ModelManager {
       ...(job ? { progress: { received: job.received, ...(job.total ? { total: job.total } : {}) } } : {}),
       ...(err ? { error: err } : {}),
       nodeTypes,
+      ...(spec.license ? { license: spec.license } : {}),
+      ...(spec.licenseUrl ? { licenseUrl: spec.licenseUrl } : {}),
+      ...(spec.commercial !== undefined ? { commercial: spec.commercial } : {}),
+      ...(spec.gated ? { gated: true } : {}),
+      ...(spec.page ? { page: spec.page } : {}),
     };
   }
 
@@ -100,7 +112,10 @@ export class ModelManager {
     const job: Job = { received: 0, abort: new AbortController() };
     this.jobs.set(id, job);
     this.errors.delete(id);
-    const url = opts.mirror && spec.url.startsWith(HF) ? opts.mirror.replace(/\/+$/, "") + spec.url.slice(HF.length) : spec.url;
+    const viaMirror = !!opts.mirror && spec.url.startsWith(HF);
+    const url = viaMirror ? opts.mirror!.replace(/\/+$/, "") + spec.url.slice(HF.length) : spec.url;
+    // The token goes only to the model's own host, never to a mirror.
+    const token = spec.gated && !viaMirror ? this.hfToken() : undefined;
     const dest = this.pathOf(spec);
     const part = `${dest}.${process.pid}.part`;
 
@@ -108,7 +123,13 @@ export class ModelManager {
       let out: fs.WriteStream | undefined;
       try {
         fs.mkdirSync(this.dir, { recursive: true });
-        const res = await fetch(url, { signal: job.abort.signal, redirect: "follow" });
+        if (spec.gated && !viaMirror && !token) throw new Error("this model needs a Hugging Face access token: save one in the model panel first");
+        const res = await fetch(url, { signal: job.abort.signal, redirect: "follow", headers: token ? { authorization: `Bearer ${token}` } : {} });
+        if ((res.status === 401 || res.status === 403) && spec.gated) {
+          throw new Error(
+            `Hugging Face refused the download (HTTP ${res.status}): sign in, accept the terms${spec.page ? ` at ${spec.page}` : ""}, and check the saved token${viaMirror ? " (tokens aren't sent to mirrors)" : ""}`,
+          );
+        }
         if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
         job.total = Number(res.headers.get("content-length")) || (spec.size ? spec.size * 1e6 : undefined);
         out = fs.createWriteStream(part);
