@@ -1,0 +1,76 @@
+id: image.remove-color
+name: 去纯色背景（绿幕 / 蓝幕）
+category: media
+description: >-
+  把纯色背景（绿幕、蓝幕或任意一种纯色）变透明，输出透明 PNG 和黑白蒙版。默认自动识别背景色，
+  绿色、蓝色背景还会去掉边缘的反色（溢色）。画面里所有和背景同色的地方都会被去掉，包括字母缝隙；
+  主体里有相近颜色时调小「容差」。白色背景用「去白底」，照片和复杂背景用「AI 抠图」。
+inputs:
+  image:
+    type: file
+    description: 纯色背景的图片
+params:
+  type: object
+  properties:
+    color:
+      type: string
+      default: auto
+      description: 背景色，例如 #00ff00；auto 从图片边缘自动识别（会跳过截图的细边框）
+    tolerance:
+      type: number
+      default: 0.1
+      minimum: 0.01
+      maximum: 0.5
+      description: 容差：多接近背景色就去掉。背景没去干净就调大；主体颜色深的部分（比如黑字）变半透明就调小
+    softness:
+      type: number
+      default: 0.05
+      minimum: 0
+      maximum: 0.5
+      description: 边缘柔化：背景和主体交界处的过渡宽度，0 为硬边
+    despill:
+      type: boolean
+      default: true
+      description: 去溢色：去掉边缘沾上的绿色或蓝色（只在绿色、蓝色背景时生效）
+    despill_strength:
+      type: number
+      default: 0.5
+      minimum: 0
+      maximum: 1
+      description: 去溢色强度：边缘还发绿就调大，主体颜色被改变就调小
+outputs:
+  image:
+    type: file
+    description: 透明背景的 PNG
+  mask:
+    type: file
+    description: 黑白蒙版（白色是保留的部分）
+  color:
+    type: string
+    description: 实际使用的背景色
+executor:
+  kind: script
+  language: js
+  file: image.remove-color.mjs
+timeout: 2m
+cache: true
+i18n:
+  en:
+    name: Remove solid background (green / blue screen)
+    description: >-
+      Make a solid-color background (green screen, blue screen, or any flat color) transparent; outputs a transparent PNG and a mask.
+      The color is detected automatically, and green or blue color cast on the edges is removed (despill). Everything matching
+      the background goes, including gaps in lettering; lower the tolerance if the subject has similar colors. Use "Remove white
+      background" for white, and "AI background removal" for photos and busy backgrounds.
+    inputs:
+      image: An image on a solid-color background
+    params:
+      color: Background color such as #00ff00; auto detects it from near the edges (skipping thin screenshot frames)
+      tolerance: How close to the background color gets removed. Raise it if background remains; lower it if dark parts (black text) turn semi-transparent
+      softness: Width of the transition at the edge; 0 for hard edges
+      despill: Remove green or blue cast on the edges (green or blue backgrounds only)
+      despill_strength: Raise it if edges still look green; lower it if the subject's colors shift
+    outputs:
+      image: PNG with a transparent background
+      mask: Black-and-white mask (white is kept)
+      color: The background color used
